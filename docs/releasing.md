@@ -22,6 +22,12 @@ Do not casually change:
 These are the only current product identifiers. No old feed, local-data path,
 redirect, alias, or compatibility wrapper is part of the release.
 
+The launcher Sparkle private key is stored in the macOS login Keychain as a
+generic-password item with service `https://sparkle-project.org` and account
+`tft-pbe-launcher`. This locator is not secret. Its public key must be
+`77t8YuvP4mvvP/3oMpVR/TqGRMCcUlrpWFIZGcWqokY=`, matching `SUPublicEDKey` in
+`launcher/Info.plist`. Do not confuse it with the separate game-update keys.
+
 ## Prepare metadata
 
 1. Update `CFBundleShortVersionString` and monotonically increase
@@ -54,7 +60,7 @@ arguments or defaults.
 Exercise generation without upload:
 
 ```sh
-: "${MACTICIAN_SPARKLE_ACCOUNT:?Set MACTICIAN_SPARKLE_ACCOUNT in the environment}"
+export MACTICIAN_SPARKLE_ACCOUNT="${MACTICIAN_SPARKLE_ACCOUNT:-tft-pbe-launcher}"
 ./scripts/publish-mactician-update.command --prepare-only
 ```
 
@@ -67,7 +73,7 @@ Prepare-only never uploads files.
 Production-specific destinations have no secret or machine-specific defaults:
 
 ```sh
-: "${MACTICIAN_SPARKLE_ACCOUNT:?Set MACTICIAN_SPARKLE_ACCOUNT in the environment}"
+export MACTICIAN_SPARKLE_ACCOUNT="${MACTICIAN_SPARKLE_ACCOUNT:-tft-pbe-launcher}"
 : "${MACTICIAN_UPDATE_SSH_TARGET:?Set MACTICIAN_UPDATE_SSH_TARGET in the environment}"
 : "${MACTICIAN_UPDATE_SSH_PORT:?Set MACTICIAN_UPDATE_SSH_PORT in the environment}"
 : "${MACTICIAN_UPDATE_REMOTE_ROOT:?Set MACTICIAN_UPDATE_REMOTE_ROOT in the environment}"
