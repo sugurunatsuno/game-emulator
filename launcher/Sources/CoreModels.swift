@@ -8,6 +8,7 @@ enum MacticianIdentity {
     static let keychainService = bundleIdentifier
     static let loggingSubsystem = bundleIdentifier
     static let websiteURL = URL(string: "https://sergeinaumov.dev/mactician")!
+    static let feedbackURL = URL(string: "https://sergeinaumov.dev/mactician/feedback")!
     static let privacyPolicyURL = URL(string: "https://sergeinaumov.dev/mactician/privacy")!
     static let extendedDiagnosticsURL = URL(
         string: "https://sergeinaumov.dev/mactician/privacy#extended-diagnostics"
@@ -21,6 +22,29 @@ enum MacticianIdentity {
         string: "https://sergeinaumov.dev/mactician/updates/game/manifest.json"
     )!
     static let gameUpdatePublicKeyBase64 = "Nadxne/Zs1kndXT8OpaShZCEgK/LqUtMv4aqGQNzCcM="
+}
+
+enum GameEdition: String, Codable, CaseIterable, Identifiable {
+    case global
+    case vietnam
+
+    var id: String { rawValue }
+    var title: String { self == .global ? "Global" : "Vietnam (VNG)" }
+    var packageName: String {
+        self == .global
+            ? "com.riotgames.league.teamfighttactics"
+            : "com.riotgames.league.teamfighttacticsvn"
+    }
+    var updatePath: String {
+        "/mactician/updates/game" + (self == .vietnam ? "/vietnam" : "")
+    }
+    var updateURL: URL {
+        URL(string: "https://sergeinaumov.dev\(updatePath)/manifest.json")!
+    }
+
+    static func selection(saved: String?) -> GameEdition {
+        GameEdition(rawValue: saved ?? "") ?? .global
+    }
 }
 
 struct ReleaseManifest: Codable, Equatable {
@@ -87,8 +111,8 @@ struct GameRelease: Codable, Equatable {
     let baseSHA256: String
     let apks: [GameAPK]
 
-    func validate() throws {
-        guard packageName == "com.riotgames.league.teamfighttactics",
+    func validate(for edition: GameEdition = .global) throws {
+        guard packageName == edition.packageName,
               !version.isEmpty,
               baseSHA256.isLowercaseSHA256,
               (1 ... 32).contains(apks.count),
@@ -98,7 +122,7 @@ struct GameRelease: Codable, Equatable {
             throw LauncherError.invalidManifest("Invalid TFT release")
         }
         for apk in apks {
-            guard !apk.name.contains("/"), apk.name.hasSuffix(".apk"),
+            guard apk.name.range(of: "^[A-Za-z0-9._-]+[.]apk$", options: .regularExpression) != nil,
                   apk.size > 0, apk.sha256.isLowercaseSHA256 else {
                 throw LauncherError.invalidManifest("Invalid APK description for \(apk.name)")
             }
@@ -214,6 +238,27 @@ struct GameLanguage: Equatable, Identifiable {
     }
 }
 
+struct InstalledGameState: Codable, Equatable {
+    var gameVersion: String?
+    var gameVersionCode: Int?
+    var gameBaseSHA256: String?
+    var overlaySHA256: String?
+
+    init() { }
+
+    init(release: GameRelease, overlaySHA256: String) {
+        gameVersion = release.version
+        gameVersionCode = release.versionCode
+        gameBaseSHA256 = release.baseSHA256
+        self.overlaySHA256 = overlaySHA256
+    }
+
+    func matches(_ release: GameRelease) -> Bool {
+        gameVersion == release.version && gameBaseSHA256 == release.baseSHA256
+            && overlaySHA256 != nil
+    }
+}
+
 struct InstallState: Codable, Equatable {
     enum Stage: String, Codable {
         case empty
@@ -223,16 +268,43 @@ struct InstallState: Codable, Equatable {
         case ready
     }
 
-    var schemaVersion: Int = 1
+    var schemaVersion: Int = 2
     var stage: Stage = .empty
     var installedComponents: [String: String] = [:]
-    var gameVersion: String?
-    var gameVersionCode: Int?
-    var gameBaseSHA256: String?
-    var overlaySHA256: String?
+    var games: [String: InstalledGameState] = [:]
     var updatedAt: Date = Date()
 
-    var isReady: Bool { schemaVersion == 1 && stage == .ready }
+    var isRuntimeReady: Bool { schemaVersion == 2 && (stage == .ready || stage == .avdCreated) }
+
+    func isReady(for edition: GameEdition, release: GameRelease) -> Bool {
+        isRuntimeReady && release.packageName == edition.packageName
+            && games[edition.id]?.matches(release) == true
+    }
+
+    init() { }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, stage, installedComponents, games, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try container.decode(Int.self, forKey: .schemaVersion)
+        guard version == 1 || version == 2 else {
+            throw LauncherError.integrity("Unsupported installation state schema: \(version)")
+        }
+        stage = try container.decode(Stage.self, forKey: .stage)
+        installedComponents = try container.decode([String: String].self, forKey: .installedComponents)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        if version == 1 {
+            let legacy = try InstalledGameState(from: decoder)
+            if stage == .ready, legacy.gameBaseSHA256 != nil {
+                games[GameEdition.global.id] = legacy
+            }
+        } else {
+            games = try container.decode([String: InstalledGameState].self, forKey: .games)
+        }
+    }
 }
 
 struct RuntimeEvent: Codable, Equatable {

@@ -14,7 +14,8 @@ readonly AVD_HOME="$(tft_resolve_avd_home)"
 readonly AVD_NAME="${TFT_AVD_NAME:-Tft}"
 readonly SERIAL="${TFT_SERIAL:-emulator-5572}"
 readonly LAUNCHER="${TFT_LAUNCHER:-$PROJECT_DIR/run-tft-gles32.command}"
-readonly PACKAGE="com.riotgames.league.teamfighttactics"
+PACKAGE="$(tft_resolve_game_package)" || exit 2
+readonly PACKAGE
 readonly CONFIG="$AVD_HOME/$AVD_NAME.avd/config.ini"
 readonly HARDWARE_CONFIG="$AVD_HOME/$AVD_NAME.avd/hardware-qemu.ini"
 readonly CONFIG_BACKUP="$CONFIG.mactician-asg-backup"

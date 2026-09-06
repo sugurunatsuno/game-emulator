@@ -16,6 +16,7 @@ final class RuntimeController {
     var isRunning: Bool { process?.isRunning == true }
 
     func start(
+        edition: GameEdition = .global,
         profile: LaunchProfile,
         effectsQuality: EffectsQuality,
         language: GameLanguage,
@@ -30,10 +31,8 @@ final class RuntimeController {
         guard !isRunning else {
             throw LauncherError.process("TFT is already launching")
         }
-        guard state.isReady,
-              state.gameVersion == gameRelease.version,
-              state.gameBaseSHA256 == gameRelease.baseSHA256,
-              state.overlaySHA256 != nil else {
+        try gameRelease.validate(for: edition)
+        guard state.isReady(for: edition, release: gameRelease) else {
             throw LauncherError.unsupportedGame("The installed TFT version is not supported by this launcher build")
         }
         // QEMU replaces the wrapper application's Dock icon and exposes its
@@ -50,7 +49,7 @@ final class RuntimeController {
         let overlayHash = try InstallerService.prepareOverlay(
             source: gameResources.appendingPathComponent("base.apk"),
             expectedSourceSHA256: gameRelease.baseSHA256,
-            destination: paths.overlayAPK,
+            destination: paths.overlayAPK(for: edition),
             stagingRoot: paths.staging,
             language: language
         )
@@ -88,7 +87,8 @@ final class RuntimeController {
             "TFT_ADB_SERVER_PORT": "5038",
             "ANDROID_ADB_SERVER_PORT": "5038",
             "ADB_MDNS_AUTO_CONNECT": "",
-            "TFT_LAUNCHER": paths.runtimeTemplate.appendingPathComponent("run-tft-angle-opengl.command").path,
+            // The runtime copy includes Game Host.app beside the launch scripts.
+            "TFT_LAUNCHER": paths.runtimeProject.appendingPathComponent("run-tft-angle-opengl.command").path,
             "TFT_GLTRANSPORT": "virtio-gpu-asg",
             "TFT_EXPECTED_GLTRANSPORT_BASELINE": "pipe",
             "TFT_AUDIO_ENABLED": "1",
@@ -96,6 +96,7 @@ final class RuntimeController {
             "TFT_DISPLAY_SIZE": profile.displaySize,
             "TFT_DISPLAY_DENSITY": "\(profile.density)",
             "TFT_GAME_LANGUAGE": language.id,
+            "TFT_GAME_PACKAGE": edition.packageName,
             "TFT_CPU_CORES": "\(cpuCores)",
             "TFT_MEMORY_MB": "\(memoryMB)",
             "TFT_UI_SCALE": uiScale,
@@ -105,7 +106,7 @@ final class RuntimeController {
             "MVK_CONFIG_MAX_ACTIVE_METAL_COMMAND_BUFFERS_PER_QUEUE": "64",
             "MVK_CONFIG_FAST_MATH_ENABLED": "1",
             "TFT_INPUT_BRIDGE_ENABLED": "0",
-            "TFT_ANGLE_OPENGL_APK": paths.overlayAPK.path,
+            "TFT_ANGLE_OPENGL_APK": paths.overlayAPK(for: edition).path,
             "TFT_ANGLE_OPENGL_APK_SHA256": overlayHash,
             "TFT_ORIGINAL_BASE_APK_SHA256": gameRelease.baseSHA256,
             "TFT_ANGLE_OPENGL_PROFILE": graphicsProfile.path,

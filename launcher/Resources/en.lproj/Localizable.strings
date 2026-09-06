@@ -35,6 +35,9 @@
 "effects_quality.maximum.detail" = "67% 3D scale, fewer effects and simpler LOD";
 
 "action.play" = "Play";
+"action.suggest_improvement" = "Suggest an improvement";
+"action.donate" = "Send a donation";
+"action.donate_soon" = "Coming soon";
 "action.update_game" = "Update game";
 "action.install" = "Install";
 "action.pause" = "Pause";
@@ -135,10 +138,10 @@
 
 "settings.maintenance.title" = "Maintenance";
 "settings.maintenance.description" = "Repair the verified installation or open Mactician diagnostics.";
-"settings.maintenance.reset_description" = "Reset removes Android, TFT, cache, and the saved Riot sign-in.";
+"settings.maintenance.reset_description" = "Reset removes Android, both game editions, their caches, and saved sign-ins.";
 
 "reset.confirmation.title" = "Reset all data?";
-"reset.confirmation.message" = "This removes the Android SDK, TFT, game cache, and saved sign-in. This action cannot be undone.";
+"reset.confirmation.message" = "This removes the Android SDK, both game editions, their caches, and saved sign-ins. This action cannot be undone.";
 "reset.confirmation.action" = "Delete Android and Riot data";
 
 "error.installation.title" = "Installation failed";
@@ -199,3 +202,9 @@
 "native_ipad.forget.confirmation.message" = "Only Mactician's saved selection is removed. The external .app, its container, Keychain items, login, and game data remain untouched.";
 "native_ipad.error.title" = "Native iPad Runtime could not continue";
 "native_ipad.error.summary" = "The selected application failed validation, launch, or exact-process lifecycle handling.";
+
+/* Game edition */
+"edition.label" = "Game edition";
+"edition.choose" = "Switch game edition";
+"edition.download_on_selection" = "On installation";
+"edition.install.description" = "Install the selected game edition. The other edition and its saved sign-in stay available.";

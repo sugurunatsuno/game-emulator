@@ -26,13 +26,13 @@ enum LauncherTests {
                     name: "base.apk",
                     size: 100,
                     sha256: String(repeating: "a", count: 64),
-                    url: URL(string: "https://sergeinaumov.dev/mactician/updates/game/releases/aaaaaaaa/base.apk")
+                    url: URL(string: "https://sergeinaumov.dev/mactician/updates/game/releases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/base.apk")
                 ),
                 GameAPK(
                     name: "split_config.arm64_v8a.apk",
                     size: 50,
                     sha256: String(repeating: "b", count: 64),
-                    url: URL(string: "https://sergeinaumov.dev/mactician/updates/game/releases/aaaaaaaa/split_config.arm64_v8a.apk")
+                    url: URL(string: "https://sergeinaumov.dev/mactician/updates/game/releases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/split_config.arm64_v8a.apk")
                 )
             ]
         )
@@ -52,7 +52,8 @@ enum LauncherTests {
             publicKeyBase64: hostedPrivateKey.publicKey.rawRepresentation.base64EncodedString()
         )
         try expect(verifiedHostedFeed.release == hostedRelease, "signed hosted game feed")
-        var olderInstallState = InstallState()
+        try testGameEditions(manifest: manifest, globalRelease: hostedRelease, key: hostedPrivateKey)
+        var olderInstallState = InstalledGameState()
         olderInstallState.gameVersion = "18.1-old"
         olderInstallState.gameVersionCode = 8_210_000
         try expect(
@@ -1576,6 +1577,99 @@ enum LauncherTests {
         print("Mactician tests: OK")
     }
 
+    private static func testGameEditions(
+        manifest: ReleaseManifest, globalRelease: GameRelease, key: Curve25519.Signing.PrivateKey
+    ) throws {
+        try expect(GameEdition.selection(saved: nil) == .global
+            && GameEdition.selection(saved: "unknown") == .global
+            && GameEdition.selection(saved: "vietnam") == .vietnam, "edition preference migration")
+        let vietnam = GameRelease(
+            packageName: GameEdition.vietnam.packageName, version: globalRelease.version,
+            versionCode: globalRelease.versionCode, baseSHA256: globalRelease.baseSHA256,
+            apks: globalRelease.apks.map { apk in
+                GameAPK(name: apk.name, size: apk.size, sha256: apk.sha256, url: URL(string:
+                    "https://sergeinaumov.dev\(GameEdition.vietnam.updatePath)/releases/\(globalRelease.baseSHA256)/\(apk.name)"))
+            }
+        )
+        func signed(_ release: GameRelease) throws -> Data {
+            let payload = try JSONEncoder().encode(HostedGameFeed(
+                schemaVersion: 1, publishedAt: "2026-09-04T12:00:00Z", release: release
+            ))
+            return try JSONEncoder().encode(HostedGameFeedEnvelope(schemaVersion: 1,
+                payload: payload.base64EncodedString(),
+                signature: key.signature(for: payload).base64EncodedString()))
+        }
+        func rejected(_ message: String, _ operation: () throws -> Void) throws {
+            do { try operation() } catch is LauncherError { return }
+            throw TestFailure(message)
+        }
+        let publicKey = key.publicKey.rawRepresentation.base64EncodedString()
+        try expect(HostedGameUpdate.decodeAndVerify(signed(vietnam), edition: .vietnam,
+            publicKeyBase64: publicKey).release == vietnam, "signed VNG feed")
+        try rejected("VNG feed accepted in Global channel") {
+            _ = try HostedGameUpdate.decodeAndVerify(signed(vietnam), edition: .global, publicKeyBase64: publicKey)
+        }
+        try rejected("Global feed accepted in VNG channel") {
+            _ = try HostedGameUpdate.decodeAndVerify(signed(globalRelease), edition: .vietnam, publicKeyBase64: publicKey)
+        }
+        for url in [
+            globalRelease.apks[0].url!.absoluteString,
+            "https://sergeinaumov.dev\(GameEdition.vietnam.updatePath)/releases/wrong/base.apk",
+            vietnam.apks[0].url!.absoluteString + "?redirect=other",
+            vietnam.apks[0].url!.absoluteString.replacingOccurrences(of: "sergeinaumov.dev", with: "example.com")
+        ] {
+            let badRelease = GameRelease(packageName: vietnam.packageName, version: vietnam.version,
+                versionCode: vietnam.versionCode, baseSHA256: vietnam.baseSHA256,
+                apks: [GameAPK(name: "base.apk", size: 100, sha256: vietnam.baseSHA256, url: URL(string: url))])
+            try rejected("Wrong VNG APK URL accepted: \(url)") {
+                _ = try HostedGameUpdate.decodeAndVerify(signed(badRelease), edition: .vietnam, publicKeyBase64: publicKey)
+            }
+        }
+        var legacy: [String: Any] = [
+            "schemaVersion": 1, "stage": "ready", "installedComponents": ["emulator": "test"],
+            "gameVersion": manifest.game.version, "gameVersionCode": manifest.game.versionCode ?? 1,
+            "gameBaseSHA256": manifest.game.baseSHA256, "overlaySHA256": String(repeating: "c", count: 64),
+            "updatedAt": "2026-09-04T12:00:00Z"
+        ]
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var state = try decoder.decode(InstallState.self, from: JSONSerialization.data(withJSONObject: legacy))
+        try expect(state.schemaVersion == 2 && state.isReady(for: .global, release: manifest.game)
+            && state.games["vietnam"] == nil, "v1 migrates only Global without reinstalling")
+        let installedGlobal = state.games["global"]
+        state.games["vietnam"] = InstalledGameState(release: vietnam, overlaySHA256: String(repeating: "d", count: 64))
+        let roundtrip = try JSONDecoder().decode(InstallState.self, from: JSONEncoder().encode(state))
+        try expect(roundtrip == state && roundtrip.isReady(for: .vietnam, release: vietnam)
+            && roundtrip.isReady(for: .global, release: manifest.game), "v2 preserves both editions")
+        state.games.removeValue(forKey: "vietnam")
+        try expect(state.games["global"] == installedGlobal && state.isReady(for: .global, release: manifest.game),
+            "removing incomplete VNG state preserves Global")
+        legacy["stage"] = "downloading"
+        let partial = try decoder.decode(InstallState.self, from: JSONSerialization.data(withJSONObject: legacy))
+        try expect(partial.games.isEmpty && !partial.isRuntimeReady, "partial v1 install stays incomplete")
+        var newer = InstalledGameState(release: vietnam, overlaySHA256: "hash")
+        newer.gameVersionCode = vietnam.versionCode! + 1
+        try rejected("VNG downgrade accepted") {
+            try InstallerService.validateCandidate(vietnam, edition: .vietnam, installed: newer)
+        }
+        newer.gameVersionCode = vietnam.versionCode
+        newer.gameBaseSHA256 = String(repeating: "f", count: 64)
+        try rejected("same version code with a different APK accepted") {
+            try InstallerService.validateCandidate(vietnam, edition: .vietnam, installed: newer)
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let paths = try LauncherPaths(root: root, resources: root.appendingPathComponent("Resources"))
+        try expect(paths.gameCache(for: .global).path == root.appendingPathComponent("game").path
+            && paths.hostedGameFeed(for: .global) != paths.hostedGameFeed(for: .vietnam)
+            && paths.overlayAPK(for: .global) != paths.overlayAPK(for: .vietnam)
+            && paths.gameResources(for: vietnam, edition: .vietnam) != paths.gameResources,
+            "edition paths preserve Global and never use its bundled APK for VNG")
+        let activity = "topResumedActivity=ActivityRecord{test u0 com.riotgames.league.teamfighttacticsvn/com.epicgames.unreal.GameActivity t1}"
+        try expect(BridgeAndroidActivityClassifier.classify(dumpsysOutput: activity,
+            packageName: GameEdition.vietnam.packageName) == .gameplay,
+            "VNG gameplay detection")
+    }
+
     private static func runNativeIPadRuntimeTests(in temporary: URL, sourceRoot: URL) throws {
         let defaultsName = "LauncherTests.native-feature.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: defaultsName) else {
@@ -1863,11 +1957,12 @@ enum LauncherTests {
         }
         var androidState = InstallState()
         androidState.stage = .ready
-        androidState.gameVersion = "android-state"
+        androidState.games[GameEdition.global.id] = InstalledGameState()
+        androidState.games[GameEdition.global.id]?.gameVersion = "android-state"
         let androidStateURL = fixtureRoot.appendingPathComponent("android-install-state.json")
         try SystemServices.saveState(androidState, to: androidStateURL)
         try expect(
-            SystemServices.loadState(from: androidStateURL).gameVersion == "android-state",
+            SystemServices.loadState(from: androidStateURL).games[GameEdition.global.id]?.gameVersion == "android-state",
             "corrupt native state does not modify Android install state"
         )
 
@@ -1893,7 +1988,7 @@ enum LauncherTests {
                 && FileManager.default.fileExists(atPath: preparedApp.path)
                 && FileManager.default.fileExists(atPath: externalContainer.path)
                 && FileManager.default.fileExists(atPath: androidAVDMarker.path)
-                && SystemServices.loadState(from: androidStateURL).gameVersion == "android-state",
+                && SystemServices.loadState(from: androidStateURL).games[GameEdition.global.id]?.gameVersion == "android-state",
             "native reset removes only native state"
         )
 

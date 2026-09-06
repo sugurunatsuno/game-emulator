@@ -407,6 +407,7 @@ enum RuntimeProbeResult: Equatable {
 }
 
 struct AndroidRuntimeLaunchConfiguration {
+    var edition: GameEdition = .global
     let profile: LaunchProfile
     let effectsQuality: EffectsQuality
     let language: GameLanguage
@@ -449,10 +450,7 @@ final class AndroidRuntimeControllerAdapter: GameRuntimeSessionControlling {
         guard case let .android(configuration) = configuration else {
             return .unavailable("Invalid Android runtime configuration")
         }
-        guard configuration.state.isReady,
-              configuration.state.gameVersion == configuration.gameRelease.version,
-              configuration.state.gameBaseSHA256 == configuration.gameRelease.baseSHA256,
-              configuration.state.overlaySHA256 != nil else {
+        guard configuration.state.isReady(for: configuration.edition, release: configuration.gameRelease) else {
             return .unavailable("The installed TFT version is not supported by this launcher build")
         }
         return .ready
@@ -466,6 +464,7 @@ final class AndroidRuntimeControllerAdapter: GameRuntimeSessionControlling {
             throw LauncherError.process("Invalid Android runtime configuration")
         }
         try runtime.start(
+            edition: configuration.edition,
             profile: configuration.profile,
             effectsQuality: configuration.effectsQuality,
             language: configuration.language,

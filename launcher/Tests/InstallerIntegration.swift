@@ -36,8 +36,8 @@ enum InstallerIntegration {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
         let state = try result!.get()
-        guard state.isReady,
-              state.gameBaseSHA256?.range(
+        guard state.isRuntimeReady,
+              state.games[GameEdition.global.id]?.gameBaseSHA256?.range(
                   of: "^[0-9a-f]{64}$",
                   options: .regularExpression
               ) != nil,

@@ -79,6 +79,7 @@ struct LauncherView: View {
                             max(0, availableWidth - LauncherTheme.Metric.stateDeckInset * 2)
                         )
                     )
+                communityActions
                 footer
             }
             .frame(width: availableWidth)
@@ -160,7 +161,7 @@ struct LauncherView: View {
                 Text(
                     model.isNativeIPadRuntimeSelected
                         ? LauncherL10n.text("header.native_ipad_experimental")
-                        : LauncherL10n.format("header.game_version_format", model.gameDisplayVersion)
+                        : model.gameVersionSummary
                 )
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundColor(LauncherTheme.ColorToken.textPrimary)
@@ -210,6 +211,28 @@ struct LauncherView: View {
         }
         .padding(.horizontal, LauncherTheme.Metric.trafficLightReserve)
         .frame(height: compact ? 104 : 152, alignment: .leading)
+    }
+
+    private var communityActions: some View {
+        HStack(spacing: LauncherTheme.Spacing.medium) {
+            Spacer()
+
+            Link(destination: MacticianIdentity.feedbackURL) {
+                Label(LauncherL10n.text("action.suggest_improvement"), systemImage: "lightbulb")
+            }
+            .buttonStyle(LauncherSecondaryButtonStyle())
+
+            Button { } label: {
+                Label(LauncherL10n.text("action.donate"), systemImage: "heart")
+            }
+            .buttonStyle(LauncherSecondaryButtonStyle())
+            .disabled(true)
+            .help(LauncherL10n.text("action.donate_soon"))
+            .accessibilityHint(LauncherL10n.text("action.donate_soon"))
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, LauncherTheme.Metric.trafficLightReserve)
+        .padding(.top, LauncherTheme.Spacing.regular)
     }
 
     private var footer: some View {

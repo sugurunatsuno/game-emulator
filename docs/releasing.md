@@ -96,6 +96,8 @@ Sparkle Ed25519 signature.
 
 ## Publish a TFT game update
 
+See [Vietnam edition inputs and validation](vietnam.md) for the VNG channel.
+
 Game releases use a separate signed manifest and do not require a new Mactician
 build. Put the complete official split APK set in one directory and run:
 
@@ -103,8 +105,15 @@ build. Put the complete official split APK set in one directory and run:
 : "${MACTICIAN_GAME_APK_DIR:?Set the split APK directory}"
 : "${MACTICIAN_GAME_VERSION:?Set the Android version name}"
 : "${MACTICIAN_GAME_VERSION_CODE:?Set the Android version code}"
+: "${MACTICIAN_ANDROID_BUILD_TOOLS:?Directory containing official aapt and apksigner}"
+export MACTICIAN_GAME_EDITION=global # or vietnam
 ./scripts/publish-game-update.command --prepare-only
 ```
+
+The publisher verifies the pinned Riot certificate, package, version code,
+and the base / ARM64 / English / mdpi split set before signing. The supplied
+version must match the APK metadata. Use separate private APK directories for
+the two packages. The default output directory includes the edition name.
 
 Review the generated payload and APK hashes. To publish, set
 `MACTICIAN_UPDATE_SSH_TARGET` and `MACTICIAN_UPDATE_REMOTE_ROOT`, then rerun
@@ -112,7 +121,9 @@ without `--prepare-only`. `MACTICIAN_GAME_SIGNING_ACCOUNT` defaults to the
 dedicated `mactician-game-updates` Keychain account.
 
 The publisher uploads immutable APK files before atomically replacing the
-signed `game/manifest.json`. Never publish an incomplete split set, reuse a
+signed `game/manifest.json` (Global) or `game/vietnam/manifest.json` (VNG).
+Publish the Vietnam feed before distributing a launcher that offers VNG.
+Never publish an incomplete split set, reuse a
 release URL for different bytes, or roll the version code backwards.
 
 ## Make the repository public

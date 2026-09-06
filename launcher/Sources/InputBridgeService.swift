@@ -5,6 +5,7 @@ import Foundation
 
 private struct BridgeConfiguration {
     let targetPID: pid_t
+    let packageName: String
     let targetBundleID: String
     let adb: URL
     let width: Int
@@ -73,7 +74,7 @@ enum BridgeForegroundActivityState: Equatable {
 enum BridgeAndroidActivityClassifier {
     private static let gameplayActivity = "com.epicgames.unreal.GameActivity"
 
-    static func classify(dumpsysOutput: String) -> BridgeForegroundActivityState {
+    static func classify(dumpsysOutput: String, packageName: String = GameEdition.global.packageName) -> BridgeForegroundActivityState {
         guard let line = dumpsysOutput.split(separator: "\n").first(where: {
             $0.contains("topResumedActivity=")
         }),
@@ -87,7 +88,8 @@ enum BridgeAndroidActivityClassifier {
             guard let slash = token.firstIndex(of: "/") else { continue }
             let activity = String(token[token.index(after: slash)...])
             guard !activity.isEmpty else { return .unknown }
-            return activity == gameplayActivity ? .gameplay : .nonGameplay
+            let package = String(token[..<slash])
+            return package == packageName && activity == gameplayActivity ? .gameplay : .nonGameplay
         }
         return .unknown
     }
@@ -219,7 +221,7 @@ private final class BridgeAndroidActivityMonitor {
               let output = String(data: data, encoding: .utf8) else {
             return .unknown
         }
-        return BridgeAndroidActivityClassifier.classify(dumpsysOutput: output)
+        return BridgeAndroidActivityClassifier.classify(dumpsysOutput: output, packageName: configuration.packageName)
     }
 
     private func publish(_ newState: BridgeForegroundActivityState) {
@@ -555,10 +557,11 @@ final class InputBridgeService {
         NSWorkspace.shared.open(settingsURL)
     }
 
-    func start(targetPID: pid_t, adb: URL, width: Int, height: Int) {
+    func start(targetPID: pid_t, adb: URL, width: Int, height: Int, packageName: String) {
         stop()
         let configuration = BridgeConfiguration(
             targetPID: targetPID,
+            packageName: packageName,
             targetBundleID: "dev.sergeinaumov.mactician.game-host",
             adb: adb,
             width: width,

@@ -37,7 +37,8 @@ final class LauncherModel: ObservableObject {
     @Published var shouldShowTelemetryNotice: Bool
     @Published var extendedDiagnosticsEnabled: Bool
     @Published private(set) var activeConfiguration: LaunchConfigurationSnapshot?
-    @Published private(set) var gameRelease: GameRelease
+    @Published private(set) var selectedEdition: GameEdition
+    @Published private(set) var gameRelease: GameRelease?
     @Published private(set) var selectedRuntimeKind = GameRuntimeKind.androidEmulator
     @Published private(set) var nativeIPadDescriptor: NativeIPadAppDescriptor?
     @Published private(set) var nativeIPadLastValidatedAt: Date?
@@ -61,7 +62,7 @@ final class LauncherModel: ObservableObject {
     private var emulatorPID: pid_t?
     private var runtimeHadError = false
     private var stopRequested = false
-    private var installCancellationRequested = false
+    @Published private(set) var installCancellationRequested = false
     private var launchProfile: LaunchProfile?
     private var launchEffectsQuality: EffectsQuality?
     private var hotkeyEventTapActive = false
@@ -77,8 +78,11 @@ final class LauncherModel: ObservableObject {
             self.paths = paths
             self.manifest = manifest
             installState = SystemServices.loadState(from: paths.stateFile)
-            gameRelease = (try? HostedGameUpdate.loadVerifiedFeed(from: paths.hostedGameFeed).release)
-                ?? manifest.game
+            let edition = GameEdition.selection(saved: UserDefaults.standard.string(forKey: "gameEdition"))
+            selectedEdition = edition
+            gameRelease = HostedGameUpdate.installedRelease(
+                for: edition, state: installState, paths: paths, manifest: manifest
+            )
             installer = InstallerService(paths: paths, manifest: manifest)
             androidRuntime = AndroidRuntimeControllerAdapter(runtime: RuntimeController(paths: paths))
             let nativeValidator = NativeIPadRuntimeValidator()
@@ -206,15 +210,63 @@ final class LauncherModel: ObservableObject {
     }
 
     var gameDisplayVersion: String {
-        LauncherMetadata.gameDisplayVersion(from: gameRelease.version)
+        gameRelease.map { LauncherMetadata.gameDisplayVersion(from: $0.version) } ?? "—"
     }
 
     var downloadSize: String {
-        LauncherMetadata.byteCount(LauncherMetadata.totalDownloadBytes(in: manifest))
+        let runtimeBytes = hasAndroidRuntime ? 0 : LauncherMetadata.totalDownloadBytes(in: manifest)
+        if selectedEdition == .vietnam, gameRelease == nil {
+            return LauncherL10n.text("edition.download_on_selection")
+        }
+        let gameBytes = selectedEdition == .vietnam
+            ? gameRelease?.apks.reduce(Int64(0)) { $0 + $1.size } ?? 0 : 0
+        return LauncherMetadata.byteCount(runtimeBytes + gameBytes)
+    }
+
+    var hasAndroidRuntime: Bool {
+        installState.isRuntimeReady
+            && FileManager.default.isExecutableFile(atPath: paths.adb.path)
+            && FileManager.default.isExecutableFile(atPath: paths.emulator.path)
+            && FileManager.default.fileExists(atPath: paths.avdINI.path)
+    }
+
+    var editionSelectionLocked: Bool { maintenanceLocked }
+
+    var gameVersionSummary: String {
+        guard let gameRelease else { return selectedEdition.title }
+        return "\(selectedEdition.title) · \(LauncherMetadata.gameDisplayVersion(from: gameRelease.version))"
+    }
+
+    func selectEdition(_ edition: GameEdition) {
+        guard selectedRuntimeKind == .androidEmulator,
+              edition != selectedEdition, !editionSelectionLocked,
+              !androidRuntime.isRunning, !nativeRuntime.isRunning else { return }
+        selectedEdition = edition
+        UserDefaults.standard.set(edition.id, forKey: "gameEdition")
+        failure = nil
+        gameUpdateResultMessage = nil
+        isGameUpdateAvailable = false
+        reloadInstallation()
+        applySelectedRuntimePresentation()
+        if mode == .needsInstall, hasAndroidRuntime {
+            install()
+        } else if mode == .ready {
+            refreshGameUpdateAvailability()
+        }
+    }
+
+    private func reloadInstallation() {
+        installState = SystemServices.loadState(from: paths.stateFile)
+        gameRelease = HostedGameUpdate.installedRelease(
+            for: selectedEdition, state: installState, paths: paths, manifest: manifest
+        )
     }
 
     var requiredFreeSpace: String {
-        LauncherMetadata.byteCount(manifest.minimumFreeBytes)
+        let gameBytes = gameRelease?.apks.reduce(Int64(0)) { $0 + $1.size } ?? 0
+        return LauncherMetadata.byteCount(
+            hasAndroidRuntime ? max(InstallerService.minimumGameFreeBytes, gameBytes * 2) : manifest.minimumFreeBytes
+        )
     }
 
     var androidSystemSummary: String {
@@ -399,8 +451,9 @@ final class LauncherModel: ObservableObject {
     }
 
     func install(repair: Bool = false) {
-        guard selectedRuntimeKind == .androidEmulator else { return }
-        guard repair || licenseAccepted else {
+        guard selectedRuntimeKind == .androidEmulator, !maintenanceLocked,
+              !androidRuntime.isRunning, !nativeRuntime.isRunning else { return }
+        guard repair || licenseAccepted || hasAndroidRuntime else {
             fail(
                 "Accept the Android SDK License Agreement before installing.",
                 origin: .installation
@@ -416,8 +469,8 @@ final class LauncherModel: ObservableObject {
         status = repair ? "Repairing installation…" : "Installing…"
         detail = "You can pause the download."
         progress = 0
-        installer.install(repair: repair, progress: { [weak self] value in
-            guard let self else { return }
+        installer.install(edition: selectedEdition, repair: repair, progress: { [weak self] value in
+            guard let self, !installCancellationRequested else { return }
             progress = value.fraction
             status = value.message
             installerPhase = value.phase
@@ -428,8 +481,9 @@ final class LauncherModel: ObservableObject {
             case let .success(state):
                 installCancellationRequested = false
                 installState = state
-                gameRelease = (try? HostedGameUpdate.loadVerifiedFeed(from: paths.hostedGameFeed).release)
-                    ?? manifest.game
+                gameRelease = HostedGameUpdate.installedRelease(
+                    for: selectedEdition, state: state, paths: paths, manifest: manifest
+                )
                 isGameUpdateAvailable = false
                 mode = .ready
                 progress = 1
@@ -441,8 +495,9 @@ final class LauncherModel: ObservableObject {
                     error: error
                 ) {
                     installCancellationRequested = false
+                    reloadInstallation()
+                    applySelectedRuntimePresentation()
                     installationWasCancelled = true
-                    mode = .needsInstall
                     status = "Installation stopped"
                     detail = "The next installation will resume incomplete downloads."
                     return
@@ -466,12 +521,12 @@ final class LauncherModel: ObservableObject {
     }
 
     func cancelInstall() {
+        guard mode == .installing, !installCancellationRequested else { return }
         installCancellationRequested = true
         installationWasCancelled = true
         installer.cancel()
-        mode = .needsInstall
-        status = "Installation stopped"
-        detail = "The next installation will resume incomplete downloads."
+        status = "Stopping installation…"
+        detail = "Waiting for the installer to finish safely."
     }
 
     func play() {
@@ -492,6 +547,9 @@ final class LauncherModel: ObservableObject {
         do {
             switch selectedRuntimeKind {
             case .androidEmulator:
+                guard let gameRelease else {
+                    throw LauncherError.unsupportedGame("Install the selected TFT edition first")
+                }
                 let profile = selectedProfile
                 let effectsQuality = selectedEffectsQuality
                 let language = selectedLanguage
@@ -502,6 +560,7 @@ final class LauncherModel: ObservableObject {
                 detail = "Starting the game in \(selectedLanguage.title)."
                 try androidRuntime.launch(
                     configuration: .android(AndroidRuntimeLaunchConfiguration(
+                        edition: selectedEdition,
                         profile: profile,
                         effectsQuality: effectsQuality,
                         language: language,
@@ -510,7 +569,7 @@ final class LauncherModel: ObservableObject {
                         uiScalePercent: selectedUIScalePercent,
                         state: installState,
                         gameRelease: gameRelease,
-                        gameResources: paths.gameResources(for: gameRelease)
+                        gameResources: paths.gameResources(for: gameRelease, edition: selectedEdition)
                     ))
                 ) { [weak self] event in
                     self?.handle(event)
@@ -590,8 +649,8 @@ final class LauncherModel: ObservableObject {
         status = "Checking for TFT updates…"
         detail = "Updates are downloaded securely from sergeinaumov.dev."
         progress = 0
-        installer.updateGame(currentState: installState, progress: { [weak self] value in
-            guard let self else { return }
+        installer.updateGame(edition: selectedEdition, currentState: installState, progress: { [weak self] value in
+            guard let self, !installCancellationRequested else { return }
             progress = value.fraction
             status = value.message
             installerPhase = value.phase
@@ -600,6 +659,7 @@ final class LauncherModel: ObservableObject {
             guard let self else { return }
             switch result {
             case let .success(update):
+                installCancellationRequested = false
                 installState = update.state
                 gameRelease = update.release
                 isGameUpdateAvailable = false
@@ -621,6 +681,15 @@ final class LauncherModel: ObservableObject {
                     to: paths.launcherLog
                 )
             case let .failure(error):
+                if InstallerCompletionPresentation.isUserCancellation(
+                    requested: installCancellationRequested, error: error
+                ) {
+                    installCancellationRequested = false
+                    reloadInstallation()
+                    applySelectedRuntimePresentation()
+                    installationWasCancelled = true
+                    return
+                }
                 fail(
                     error.localizedDescription,
                     origin: failureOrigin(for: error, fallback: .installation)
@@ -637,7 +706,7 @@ final class LauncherModel: ObservableObject {
               !isCheckingGameUpdate else { return }
         isCheckingGameUpdate = true
         isGameUpdateAvailable = false
-        installer.checkGameUpdateAvailability(currentState: installState) { [weak self] result in
+        installer.checkGameUpdateAvailability(edition: selectedEdition, currentState: installState) { [weak self] result in
             guard let self else { return }
             isCheckingGameUpdate = false
             switch result {
@@ -676,6 +745,7 @@ final class LauncherModel: ObservableObject {
                 try FileManager.default.removeItem(at: paths.root)
             }
             installState = InstallState()
+            gameRelease = selectedEdition == .global ? manifest.game : nil
             isGameUpdateAvailable = false
             isCheckingGameUpdate = false
             mode = .needsInstall
@@ -780,7 +850,7 @@ final class LauncherModel: ObservableObject {
             } else {
                 status = "TFT is open"
                 detail = "Space — shop  •  D — reroll  •  F — XP  •  Tab — items/traits  •  V — players/damage  •  Control + Fn + F — fill window."
-                loginAnimationRepair.start(adb: paths.adb, log: paths.launcherLog)
+                loginAnimationRepair.start(adb: paths.adb, log: paths.launcherLog, packageName: selectedEdition.packageName)
                 if let emulatorPID {
                     let profile = launchProfile ?? selectedProfile
                     audioRecovery.start(
@@ -788,12 +858,13 @@ final class LauncherModel: ObservableObject {
                         adb: paths.adb,
                         log: paths.launcherLog
                     )
-                    fpsOverlay.start(targetPID: emulatorPID, adb: paths.adb)
+                    fpsOverlay.start(targetPID: emulatorPID, adb: paths.adb, packageName: selectedEdition.packageName)
                     inputBridge.start(
                         targetPID: emulatorPID,
                         adb: paths.adb,
                         width: profile.width,
-                        height: profile.height
+                        height: profile.height,
+                        packageName: selectedEdition.packageName
                     )
                 }
             }
@@ -895,6 +966,7 @@ final class LauncherModel: ObservableObject {
             if Self.installationLooksReady(
                 state: installState,
                 paths: paths,
+                edition: selectedEdition,
                 gameRelease: gameRelease
             ) {
                 mode = .ready
@@ -974,15 +1046,13 @@ final class LauncherModel: ObservableObject {
     private static func installationLooksReady(
         state: InstallState,
         paths: LauncherPaths,
-        gameRelease: GameRelease
+        edition: GameEdition,
+        gameRelease: GameRelease?
     ) -> Bool {
-        state.isReady
-            && state.gameVersion == gameRelease.version
-            && state.gameBaseSHA256 == gameRelease.baseSHA256
-            && state.overlaySHA256 != nil
+        guard let gameRelease else { return false }
+        return state.isReady(for: edition, release: gameRelease)
             && FileManager.default.isExecutableFile(atPath: paths.adb.path)
             && FileManager.default.isExecutableFile(atPath: paths.emulator.path)
             && FileManager.default.fileExists(atPath: paths.avdINI.path)
-            && FileManager.default.fileExists(atPath: paths.overlayAPK.path)
     }
 }

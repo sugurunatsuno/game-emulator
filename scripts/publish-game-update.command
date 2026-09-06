@@ -5,6 +5,7 @@ readonly PROJECT_DIR="${0:A:h:h}"
 readonly SPARKLE_ROOT="$("$PROJECT_DIR/scripts/prepare-sparkle.command")"
 readonly SIGN_UPDATE="$SPARKLE_ROOT/bin/sign_update"
 readonly APK_DIR="${MACTICIAN_GAME_APK_DIR:-${TFT_GAME_APK_DIR:-}}"
+readonly EDITION="${MACTICIAN_GAME_EDITION:-global}"
 readonly VERSION="${MACTICIAN_GAME_VERSION:-}"
 readonly VERSION_CODE="${MACTICIAN_GAME_VERSION_CODE:-}"
 readonly SIGNING_ACCOUNT="${MACTICIAN_GAME_SIGNING_ACCOUNT:-mactician-game-updates}"
@@ -13,7 +14,13 @@ readonly UPDATE_BASE_URL="${MACTICIAN_UPDATE_BASE_URL:-https://sergeinaumov.dev/
 readonly SSH_TARGET="${MACTICIAN_UPDATE_SSH_TARGET:-}"
 readonly SSH_PORT="${MACTICIAN_UPDATE_SSH_PORT:-22}"
 readonly REMOTE_ROOT="${MACTICIAN_UPDATE_REMOTE_ROOT:-}"
-readonly OUTPUT_ROOT="${MACTICIAN_GAME_UPDATE_WORKDIR:-$PROJECT_DIR/dist/mactician-game-update}"
+readonly OUTPUT_ROOT="${MACTICIAN_GAME_UPDATE_WORKDIR:-$PROJECT_DIR/dist/mactician-game-update-$EDITION}"
+readonly BUILD_TOOLS="${MACTICIAN_ANDROID_BUILD_TOOLS:-}"
+case "$EDITION" in
+    global) readonly GAME_PATH="game" ;;
+    vietnam) readonly GAME_PATH="game/vietnam" ;;
+    *) print -u2 "MACTICIAN_GAME_EDITION must be global or vietnam."; exit 2 ;;
+esac
 typeset -i PREPARE_ONLY=0
 
 usage() {
@@ -40,6 +47,21 @@ done
 command -v jq >/dev/null || { print -u2 "jq is required."; exit 1; }
 command -v openssl >/dev/null || { print -u2 "openssl is required."; exit 1; }
 
+# Verify every split before creating output or asking Keychain to sign anything.
+[[ -x "$BUILD_TOOLS/aapt" && -x "$BUILD_TOOLS/apksigner" ]] || {
+    print -u2 "MACTICIAN_ANDROID_BUILD_TOOLS must contain official aapt and apksigner tools."
+    exit 2
+}
+readonly VERIFIED_RELEASE="$(python3 "$PROJECT_DIR/scripts/verify-game-apks.py" \
+    --edition "$EDITION" --apk-dir "$APK_DIR" \
+    --aapt "$BUILD_TOOLS/aapt" --apksigner "$BUILD_TOOLS/apksigner")"
+[[ "$(jq -r '.version' <<<"$VERIFIED_RELEASE")" == "$VERSION" \
+    && "$(jq -r '.versionCode' <<<"$VERIFIED_RELEASE")" == "$VERSION_CODE" ]] || {
+    print -u2 "Requested version does not match the signed APK metadata."
+    exit 2
+}
+readonly PACKAGE_NAME="$(jq -r '.packageName' <<<"$VERIFIED_RELEASE")"
+
 typeset -a APK_FILES
 typeset apk name size sha256 url apk_json='[]'
 APK_FILES=("$APK_DIR/base.apk")
@@ -64,7 +86,7 @@ for apk in "${APK_FILES[@]}"; do
     if [[ "$name" == "base.apk" ]]; then
         readonly BASE_SHA256="$sha256"
     fi
-    url="$UPDATE_BASE_URL/game/releases/$BASE_SHA256/$name"
+    url="$UPDATE_BASE_URL/$GAME_PATH/releases/$BASE_SHA256/$name"
     apk_json="$(jq -c \
         --arg name "$name" \
         --arg url "$url" \
@@ -91,7 +113,7 @@ done
 
 jq -n \
     --arg publishedAt "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    --arg packageName "com.riotgames.league.teamfighttactics" \
+    --arg packageName "$PACKAGE_NAME" \
     --arg version "$VERSION" \
     --argjson versionCode "$VERSION_CODE" \
     --arg baseSHA256 "$BASE_SHA256" \
@@ -145,11 +167,11 @@ remote_quote() {
     print -r -- "'${1//\'/\'\\\'\'}'"
 }
 
-readonly REMOTE_RELEASE="$REMOTE_ROOT/game/releases/$BASE_SHA256"
-readonly REMOTE_STAGING="$REMOTE_ROOT/game/.release-$BASE_SHA256-$$"
-readonly REMOTE_MANIFEST_NEXT="$REMOTE_ROOT/game/.manifest-$$.json"
+readonly REMOTE_RELEASE="$REMOTE_ROOT/$GAME_PATH/releases/$BASE_SHA256"
+readonly REMOTE_STAGING="$REMOTE_ROOT/$GAME_PATH/.release-$BASE_SHA256-$$"
+readonly REMOTE_MANIFEST_NEXT="$REMOTE_ROOT/$GAME_PATH/.manifest-$$.json"
 ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
-    "mkdir -p -- $(remote_quote "$REMOTE_STAGING") $(remote_quote "$REMOTE_ROOT/game/releases")"
+    "mkdir -p -- $(remote_quote "$REMOTE_STAGING") $(remote_quote "$REMOTE_ROOT/$GAME_PATH/releases")"
 scp -P "$SSH_PORT" -o StrictHostKeyChecking=accept-new \
     "$RELEASE_ROOT"/*.apk \
     "$SSH_TARGET:$REMOTE_STAGING/"
@@ -159,6 +181,6 @@ scp -P "$SSH_PORT" -o StrictHostKeyChecking=accept-new \
     "$MANIFEST" \
     "$SSH_TARGET:$REMOTE_MANIFEST_NEXT"
 ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
-    "chmod 644 -- $(remote_quote "$REMOTE_MANIFEST_NEXT") && mv -f -- $(remote_quote "$REMOTE_MANIFEST_NEXT") $(remote_quote "$REMOTE_ROOT/game/manifest.json")"
+    "chmod 644 -- $(remote_quote "$REMOTE_MANIFEST_NEXT") && mv -f -- $(remote_quote "$REMOTE_MANIFEST_NEXT") $(remote_quote "$REMOTE_ROOT/$GAME_PATH/manifest.json")"
 
-print "Published TFT $VERSION to $UPDATE_BASE_URL/game/manifest.json"
+print "Published TFT $VERSION to $UPDATE_BASE_URL/$GAME_PATH/manifest.json"

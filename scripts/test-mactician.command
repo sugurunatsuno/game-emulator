@@ -2382,6 +2382,15 @@ if ! grep -Fq 'field__input--animate' \
     exit 1
 fi
 
+for game_test_package in com.riotgames.league.teamfighttactics com.riotgames.league.teamfighttacticsvn; do
+    resolved_package="$(TFT_GAME_PACKAGE="$game_test_package" zsh -c 'source "$1"; tft_resolve_game_package' -- "$PROJECT_DIR/scripts/android-environment.sh")"
+    [[ "$resolved_package" == "$game_test_package" ]] || exit 1
+done
+if TFT_GAME_PACKAGE='unexpected;package' zsh -c 'source "$1"; tft_resolve_game_package' -- "$PROJECT_DIR/scripts/android-environment.sh" >/dev/null 2>&1; then
+    print -u2 "Unexpected Android package was accepted."
+    exit 1
+fi
+
 # A user-requested STOP sends TERM while the runtime child is still alive.
 # Reproduce that lifecycle with caffeinate as a harmless long-running child and
 # verify that it produces a normal stopped event, not a Repair error.
@@ -2451,7 +2460,7 @@ fi
 if [[ "$*" == *" cmd locale set-app-locales"* ]]; then
     exit 0
 fi
-if [[ "$*" == *" pidof com.riotgames.league.teamfighttactics" ]]; then
+if [[ "$*" == *" pidof $TFT_GAME_PACKAGE" ]]; then
     typeset -i count=0
     [[ -f "$TFT_FAKE_ADB_STATE" ]] && count="$(<"$TFT_FAKE_ADB_STATE")"
     (( count += 1 ))
@@ -2462,10 +2471,13 @@ fi
 exit 0
 FAKE_ADB_EOF
 chmod 755 "$GAME_EXIT_ADB"
+for game_test_package in com.riotgames.league.teamfighttactics com.riotgames.league.teamfighttacticsvn; do
+rm -f "$GAME_EXIT_STATE"
 env \
     TFT_RUNTIME_PROJECT="$LIFECYCLE_ROOT/runtime" \
     TFT_LAUNCH_LOG="$LIFECYCLE_ROOT/game-exit-runtime.log" \
     TFT_ADB="$GAME_EXIT_ADB" \
+    TFT_GAME_PACKAGE="$game_test_package" \
     TFT_FAKE_ADB_STATE="$GAME_EXIT_STATE" \
     TFT_AVD_HOME="$LIFECYCLE_ROOT/avd" \
     TFT_AVD_NAME=Tft \
@@ -2479,7 +2491,7 @@ env \
     TFT_PERFORMANCE_MODE=0 \
     "$LAUNCHER_DIR/Resources/launcher-runtime.command" \
     >"$LIFECYCLE_ROOT/game-exit-events.jsonl" &
-readonly GAME_EXIT_PID=$!
+GAME_EXIT_PID=$!
 typeset game_exit_detected=0
 for game_exit_attempt in {1..200}; do
     if grep -q '"event":"game_stopped"' \
@@ -2501,6 +2513,8 @@ if (( game_exit_detected == 0 )) \
     cat "$LIFECYCLE_ROOT/game-exit-events.jsonl" >&2
     exit 1
 fi
+
+done
 
 mkdir -p "$LAUNCHER_DIR/.build/module-cache"
 xcrun swiftc \

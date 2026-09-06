@@ -184,12 +184,12 @@ private final class FPSOverlayPanel {
 }
 
 private struct FPSOverlayConfiguration {
+    let packageName: String
     let targetPID: pid_t
     let adb: URL
 }
 
 private final class FPSOverlaySession {
-    private static let package = "com.riotgames.league.teamfighttactics"
     private static let pollInterval: TimeInterval = 2
 
     private let configuration: FPSOverlayConfiguration
@@ -283,7 +283,7 @@ private final class FPSOverlaySession {
 
     private func queryLayer() -> String? {
         guard let output = runADB(["shell", "dumpsys SurfaceFlinger --list"]) else { return nil }
-        return SurfaceFlingerFPS.gameLayer(from: output, package: Self.package)
+        return SurfaceFlingerFPS.gameLayer(from: output, package: configuration.packageName)
     }
 
     private func runADB(_ arguments: [String]) -> String? {
@@ -365,10 +365,10 @@ final class FPSOverlayService {
         stop()
     }
 
-    func start(targetPID: pid_t, adb: URL) {
+    func start(targetPID: pid_t, adb: URL, packageName: String) {
         stop()
         let session = FPSOverlaySession(
-            configuration: FPSOverlayConfiguration(targetPID: targetPID, adb: adb)
+            configuration: FPSOverlayConfiguration(packageName: packageName, targetPID: targetPID, adb: adb)
         ) { [weak self] update in
             DispatchQueue.main.async {
                 self?.panel.update(update, targetPID: targetPID)

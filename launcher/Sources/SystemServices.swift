@@ -102,7 +102,7 @@ enum SystemServices {
     static func loadState(from url: URL) -> InstallState {
         guard let data = try? Data(contentsOf: url),
               let state = try? JSONDecoder.launcher.decode(InstallState.self, from: data),
-              state.schemaVersion == 1 else {
+              state.schemaVersion == 2 else {
             return InstallState()
         }
         return state

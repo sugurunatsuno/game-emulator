@@ -45,17 +45,22 @@ struct LauncherPaths {
     var avdBootCompleted: URL { avdDirectory.appendingPathComponent("bootcompleted.ini") }
     var runtimeProject: URL { root.appendingPathComponent("runtime-project", isDirectory: true) }
     var downloads: URL { root.appendingPathComponent("downloads", isDirectory: true) }
-    var gameCache: URL { root.appendingPathComponent("game", isDirectory: true) }
-    var hostedGameFeed: URL { gameCache.appendingPathComponent("manifest.json") }
-    func gameReleaseDirectory(baseSHA256: String) -> URL {
-        gameCache.appendingPathComponent("releases/\(baseSHA256)", isDirectory: true)
+    func gameCache(for edition: GameEdition) -> URL {
+        // Keep the existing Global cache in place when upgrading the launcher.
+        root.appendingPathComponent(edition == .global ? "game" : "game/vietnam", isDirectory: true)
     }
-    func gameResources(for release: GameRelease) -> URL {
-        let hosted = gameReleaseDirectory(baseSHA256: release.baseSHA256)
+    func hostedGameFeed(for edition: GameEdition) -> URL {
+        gameCache(for: edition).appendingPathComponent("manifest.json")
+    }
+    func gameReleaseDirectory(for edition: GameEdition, baseSHA256: String) -> URL {
+        gameCache(for: edition).appendingPathComponent("releases/\(baseSHA256)", isDirectory: true)
+    }
+    func gameResources(for release: GameRelease, edition: GameEdition) -> URL {
+        let hosted = gameReleaseDirectory(for: edition, baseSHA256: release.baseSHA256)
         if FileManager.default.fileExists(atPath: hosted.appendingPathComponent("base.apk").path) {
             return hosted
         }
-        return gameResources
+        return edition == .global ? gameResources : hosted
     }
     var staging: URL { root.appendingPathComponent(".staging", isDirectory: true) }
     var stateFile: URL { root.appendingPathComponent("install-state.json") }
@@ -83,8 +88,9 @@ struct LauncherPaths {
             "artifacts/tft-18.1-angle-opengl/\(quality.profileFilename)"
         )
     }
-    var overlayAPK: URL {
-        runtimeProject.appendingPathComponent("artifacts/tft-18.1-angle-opengl/base-angle-opengl.apk")
+    func overlayAPK(for edition: GameEdition) -> URL {
+        // Runtime scripts are replaced on every launch; game overlays survive that refresh.
+        gameCache(for: edition).appendingPathComponent("overlay/base-angle-opengl.apk")
     }
     var runtimeHelper: URL { bundleResources.appendingPathComponent("launcher-runtime.command") }
     var qemuHypervisorEntitlements: URL {

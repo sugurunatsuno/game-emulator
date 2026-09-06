@@ -39,6 +39,47 @@ struct LauncherStateDeck: View {
     }
 }
 
+private struct LauncherEditionMenu: View {
+    @ObservedObject var model: LauncherModel
+    @State private var isHovered = false
+
+    var body: some View {
+        Menu {
+            Picker(LauncherL10n.text("edition.label"), selection: Binding(
+                get: { model.selectedEdition },
+                set: { model.selectEdition($0) }
+            )) {
+                ForEach(GameEdition.allCases) { edition in
+                    Text(edition.title).tag(edition)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Text(model.selectedEdition.title)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.visible)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundColor(
+            isHovered && !model.editionSelectionLocked
+                ? LauncherTheme.ColorToken.textPrimary
+                : LauncherTheme.ColorToken.textSecondary
+        )
+        .padding(.horizontal, LauncherTheme.Spacing.medium)
+        .frame(height: LauncherTheme.Metric.standardControlHeight)
+        .background(
+            RoundedRectangle(cornerRadius: LauncherTheme.Metric.controlRadius)
+                .fill(Color.white.opacity(isHovered && !model.editionSelectionLocked ? 0.06 : 0.025))
+        )
+        .fixedSize()
+        .disabled(model.editionSelectionLocked)
+        .onHover { isHovered = $0 }
+        .accessibilityLabel(LauncherL10n.text("edition.label"))
+        .accessibilityValue(model.selectedEdition.title)
+        .help(LauncherL10n.text("edition.choose"))
+    }
+}
+
 private struct LauncherNativeIPadRequiredView: View {
     @ObservedObject var model: LauncherModel
     @State private var showsForgetConfirmation = false
@@ -214,7 +255,8 @@ private struct LauncherInstallRequiredView: View {
                     model.installationWasCancelled ? "install.cancelled.title" : "install.required.title"
                 ),
                 description: LauncherL10n.text(
-                    model.installationWasCancelled ? "install.cancelled.description" : "install.required.description"
+                    model.installationWasCancelled ? "install.cancelled.description"
+                        : (model.hasAndroidRuntime ? "edition.install.description" : "install.required.description")
                 )
             )
 
@@ -236,46 +278,52 @@ private struct LauncherInstallRequiredView: View {
                 )
             }
 
-            DisclosureGroup(isExpanded: $showsInstallDetails) {
-                HStack(spacing: LauncherTheme.Spacing.large) {
-                    Label(model.androidSystemSummary, systemImage: "cpu")
-                    Label(
-                        LauncherL10n.format("install.emulator_format", model.emulatorVersion),
-                        systemImage: "display"
-                    )
-                    Label(LauncherL10n.text("install.clean_profile"), systemImage: "lock.shield")
+            if !model.hasAndroidRuntime {
+                DisclosureGroup(isExpanded: $showsInstallDetails) {
+                    HStack(spacing: LauncherTheme.Spacing.large) {
+                        Label(model.androidSystemSummary, systemImage: "cpu")
+                        Label(
+                            LauncherL10n.format("install.emulator_format", model.emulatorVersion),
+                            systemImage: "display"
+                        )
+                        Label(LauncherL10n.text("install.clean_profile"), systemImage: "lock.shield")
+                    }
+                    .font(.system(size: 12))
+                    .foregroundColor(LauncherTheme.ColorToken.textSecondary)
+                    .padding(.top, LauncherTheme.Spacing.small)
+                } label: {
+                    Text(LauncherL10n.text("install.what_is_installed"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(LauncherTheme.ColorToken.textPrimary)
                 }
-                .font(.system(size: 12))
-                .foregroundColor(LauncherTheme.ColorToken.textSecondary)
-                .padding(.top, LauncherTheme.Spacing.small)
-            } label: {
-                Text(LauncherL10n.text("install.what_is_installed"))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(LauncherTheme.ColorToken.textPrimary)
             }
 
             HStack(alignment: .center, spacing: LauncherTheme.Spacing.regular) {
-                Toggle(
-                    LauncherL10n.text("install.license.accept"),
-                    isOn: $model.licenseAccepted
-                )
-                .toggleStyle(.checkbox)
-                .font(.system(size: 13))
+                if !model.hasAndroidRuntime {
+                    Toggle(
+                        LauncherL10n.text("install.license.accept"),
+                        isOn: $model.licenseAccepted
+                    )
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 13))
 
-                Link(
-                    LauncherL10n.text("install.license.terms"),
-                    destination: URL(string: "https://developer.android.com/studio/terms")!
-                )
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(LauncherTheme.ColorToken.interactive)
+                    Link(
+                        LauncherL10n.text("install.license.terms"),
+                        destination: URL(string: "https://developer.android.com/studio/terms")!
+                    )
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(LauncherTheme.ColorToken.interactive)
+                }
 
                 Spacer()
+
+                LauncherEditionMenu(model: model)
 
                 Button(LauncherL10n.text("action.install")) { model.install() }
                     .buttonStyle(LauncherPrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!model.licenseAccepted)
-                    .accessibilityHint(LauncherL10n.text("install.license.hint"))
+                    .disabled(!model.licenseAccepted && !model.hasAndroidRuntime)
+                    .accessibilityHint(model.hasAndroidRuntime ? "" : LauncherL10n.text("install.license.hint"))
             }
         }
     }
@@ -336,9 +384,11 @@ private struct LauncherInstallingView: View {
                     LauncherL10n.text(model.isPaused ? "action.resume" : "action.pause")
                 ) { model.togglePause() }
                     .buttonStyle(LauncherSecondaryButtonStyle())
+                    .disabled(model.installCancellationRequested)
 
                 Button(LauncherL10n.text("action.cancel")) { model.cancelInstall() }
                     .buttonStyle(LauncherTertiaryButtonStyle(tint: LauncherTheme.ColorToken.danger))
+                    .disabled(model.installCancellationRequested)
 
                 Spacer()
 
@@ -369,7 +419,7 @@ private struct LauncherReadyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LauncherTheme.Spacing.large) {
-            HStack(alignment: .top, spacing: LauncherTheme.Spacing.large) {
+            HStack(alignment: .center, spacing: LauncherTheme.Spacing.large) {
                 LauncherStatusHeader(
                     symbol: "checkmark",
                     color: LauncherTheme.ColorToken.success,
@@ -377,15 +427,18 @@ private struct LauncherReadyView: View {
                     description: LauncherL10n.text("ready.description")
                 )
                 Spacer()
-                if model.isGameUpdateAvailable {
-                    Button(LauncherL10n.text("action.update_game")) { model.updateGame() }
-                        .buttonStyle(LauncherPrimaryButtonStyle())
-                        .keyboardShortcut(.defaultAction)
-                } else {
-                    Button(LauncherL10n.text("action.play")) { model.play() }
-                        .buttonStyle(LauncherPrimaryButtonStyle())
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(model.isCheckingGameUpdate)
+                HStack(spacing: LauncherTheme.Spacing.medium) {
+                    LauncherEditionMenu(model: model)
+                    if model.isGameUpdateAvailable {
+                        Button(LauncherL10n.text("action.update_game")) { model.updateGame() }
+                            .buttonStyle(LauncherPrimaryButtonStyle())
+                            .keyboardShortcut(.defaultAction)
+                    } else {
+                        Button(LauncherL10n.text("action.play")) { model.play() }
+                            .buttonStyle(LauncherPrimaryButtonStyle())
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(model.isCheckingGameUpdate)
+                    }
                 }
             }
 
@@ -835,6 +888,9 @@ private struct LauncherFailureView: View {
             }
 
             HStack(spacing: LauncherTheme.Spacing.medium) {
+                if !model.isNativeIPadRuntimeSelected {
+                    LauncherEditionMenu(model: model)
+                }
                 if failure.recoveryAction != .none {
                     Button(LauncherL10n.text(
                         model.isNativeIPadRuntimeSelected

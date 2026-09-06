@@ -74,8 +74,11 @@ flowchart LR
 
 `InstallState.Stage` progresses through `empty`, `downloading`, `sdk_installed`,
 `avd_created`, and `ready`. The JSON state also records installed component
-versions, pinned game version/base hash, overlay hash, schema version, and last
-update time. A partially written or incompatible state fails back to an empty
+versions and a `games` map keyed by `global` and `vietnam`, with each game’s
+version, version code, base hash, and overlay hash. Schema 2 migrates the old
+single-game schema 1 into Global in memory, preserving its existing AVD and cache.
+The selected edition is stored separately in `UserDefaults` (`gameEdition`).
+Selection is locked during installation, update checks, and gameplay. A partially written or incompatible state fails back to an empty
 state.
 
 Installer outputs are staged before replacement. The runtime project is
@@ -89,9 +92,11 @@ Default root: `$HOME/Library/Application Support/Mactician`.
 
 ```text
 sdk/                     pinned Platform Tools, Emulator, and system image
-avd/TftPBE.avd/          Android virtual-device state and game data
+avd/Tft.avd/             Android virtual-device state and game data
 runtime-project/         refreshed Mactician-owned scripts and profiles
 downloads/               resumable component archives during installation
+game/                    Global signed feed, APK releases, and overlay
+game/vietnam/            Vietnam signed feed, APK releases, and overlay
 .staging/                 transactional temporary files
 logs/launcher.log        launcher/runtime diagnostics
 install-state.json       durable installation state
@@ -99,9 +104,17 @@ native-ipad/
   native-ipad-state.json validated prepared-app bookmark and metadata
 ```
 
-Game APKs are build-time application resources; they are verified against
-`release-manifest.json` before installation. They are not stored in this source
-repository.
+The bundled Global APKs are verified against `release-manifest.json`. Vietnam
+(`com.riotgames.league.teamfighttacticsvn`) downloads on demand from the separately
+signed `/mactician/updates/game/vietnam/manifest.json` feed. Global retains
+`/mactician/updates/game/manifest.json` and its bundled offline fallback. Both
+feeds use the pinned signing key and validate exact package and edition-specific
+APK URLs. A cached verified feed supports offline repair; a bad signature or a
+cross-edition feed fails closed. APKs are not stored in this source repository.
+
+Both Android packages coexist in the same AVD. Launch, locale, PID polling,
+input, FPS, login animation repair, and PSO workers use the selected package.
+Host and guest overlays are separated by edition. Reset removes both editions.
 
 ## Launch and stop
 

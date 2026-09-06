@@ -35,6 +35,9 @@
 "effects_quality.maximum.detail" = "67% масштаба 3D, меньше эффектов и более простой LOD";
 
 "action.play" = "Играть";
+"action.suggest_improvement" = "Предложить улучшение";
+"action.donate" = "Отправить донат";
+"action.donate_soon" = "Скоро";
 "action.update_game" = "Обновить игру";
 "action.install" = "Установить";
 "action.pause" = "Приостановить";
@@ -135,10 +138,10 @@
 
 "settings.maintenance.title" = "Обслуживание";
 "settings.maintenance.description" = "Восстановление проверенной установки и диагностика Mactician.";
-"settings.maintenance.reset_description" = "Сброс удалит Android, TFT, кэш и сохранённый вход Riot.";
+"settings.maintenance.reset_description" = "Сброс удалит Android, обе версии игры, их кэш и сохранённые входы.";
 
 "reset.confirmation.title" = "Сбросить все данные?";
-"reset.confirmation.message" = "Будут удалены Android SDK, TFT, кэш игры и сохранённый вход. Это действие нельзя отменить.";
+"reset.confirmation.message" = "Будут удалены Android SDK, обе версии игры, их кэш и сохранённые входы. Это действие нельзя отменить.";
 "reset.confirmation.action" = "Удалить данные Android и Riot";
 
 "error.installation.title" = "Не удалось установить игру";
@@ -199,3 +202,9 @@
 "native_ipad.forget.confirmation.message" = "Будет удалён только сохранённый выбор Mactician. Внешний .app, его контейнер, записи Keychain, вход и игровые данные останутся без изменений.";
 "native_ipad.error.title" = "Native iPad Runtime не может продолжить работу";
 "native_ipad.error.summary" = "Не удалось проверить или запустить выбранное приложение либо корректно обработать жизненный цикл точного процесса.";
+
+/* Game edition */
+"edition.label" = "Версия игры";
+"edition.choose" = "Выбрать версию игры";
+"edition.download_on_selection" = "При установке";
+"edition.install.description" = "Установите выбранную версию игры. Другая версия и её аккаунт сохранятся.";

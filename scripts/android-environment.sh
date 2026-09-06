@@ -88,3 +88,17 @@ tft_resolve_emulator() {
 tft_resolve_avd_home() {
     print -r -- "${TFT_AVD_HOME:-${ANDROID_AVD_HOME:-$HOME/.android/avd}}"
 }
+
+# Only supported, independently signed live applications may enter guest commands.
+tft_resolve_game_package() {
+    local game_package="${TFT_GAME_PACKAGE:-com.riotgames.league.teamfighttactics}"
+    case "$game_package" in
+        com.riotgames.league.teamfighttactics|com.riotgames.league.teamfighttacticsvn)
+            print -r -- "$game_package"
+            ;;
+        *)
+            print -u2 "Unsupported TFT game package: $game_package"
+            return 2
+            ;;
+    esac
+}
