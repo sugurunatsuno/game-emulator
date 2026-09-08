@@ -9,6 +9,7 @@ readonly MODULE_CACHE="${TFT_SCREEN_CLASSIFIER_MODULE_CACHE:-$PROJECT_DIR/runtim
 mkdir -p "${OUTPUT:h}" "$MODULE_CACHE"
 /usr/bin/xcrun swiftc \
     -O \
+    -target "${TFT_SCREEN_CLASSIFIER_TARGET:-arm64-apple-macosx12.0}" \
     -module-cache-path "$MODULE_CACHE" \
     -framework CoreGraphics \
     -framework ImageIO \

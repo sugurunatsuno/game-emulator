@@ -76,6 +76,9 @@ struct LauncherPaths {
             isDirectory: true
         )
     }
+    var performanceClassifier: URL {
+        bundleResources.deletingLastPathComponent().appendingPathComponent("Helpers/tft-screen-classifier")
+    }
     var manifest: URL { bundleResources.appendingPathComponent("release-manifest.json") }
     var shaderProfile: URL {
         runtimeProject.appendingPathComponent("artifacts/tft-18.1-angle-opengl/Android_Codex.DeviceProfiles.shader-prewarm.ini")

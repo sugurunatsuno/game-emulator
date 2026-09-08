@@ -1,8 +1,8 @@
 # Telemetry and privacy
 
 Mactician has minimized basic events, an anonymous daily-active heartbeat, a
-duration-only summary for every completed session, and separately consented
-extended diagnostics. Event JSON has no stable installation or user identifier. The server retains transport
+duration-only summary for every completed session, performance metrics for every
+Android launch, and separately consented extended diagnostics. Event JSON has no stable installation or user identifier. The server retains transport
 source IPs for eligible first-session and snapshot events for 365 days, so those
 events are not unlinkable end-to-end. It does not retain the transport source IP
 or raw payload for daily-active events or session summaries. The minimized payload reduces privacy risk
@@ -148,8 +148,10 @@ users, installations, or per-user engagement.
 ## Optional extended diagnostics
 
 Extended diagnostics are created and sent only when
-`telemetry.extendedConsent.state.v1` is `granted` for consent version 1.
+`telemetry.extendedConsent.state.v1` is `granted` for consent version 2.
 `unknown` and `denied` both prohibit creation and transmission.
+The API still accepts version-1 completed-session diagnostics from old launchers.
+An old grant is invalidated and the notice is shown again; an old refusal remains a refusal.
 
 Each completed session then sends an independent event:
 
@@ -162,7 +164,7 @@ Each completed session then sends an independent event:
   "duration_seconds": 2871,
   "launcher_version": "1.0.0",
   "launcher_build": "33",
-  "consent_version": 1,
+  "consent_version": 2,
   "launcher_settings": {
     "profile_id": "quality",
     "effects_quality_id": "performance",
@@ -185,10 +187,56 @@ Each completed session then sends an independent event:
 It never contains an installation ID, Mac name, serial number, MAC address,
 Apple ID, macOS username, Riot ID, IP field, application list, or game logs.
 Turning diagnostics off immediately stops event creation and deletes the entire
-local diagnostic queue; it does not affect pending basic events or anonymous
-session summaries. A change to
+local optional diagnostic queue; it does not affect performance collection,
+its active/pending checkpoints, other basic events or anonymous session summaries. A change to
 the diagnostic field set increments `consent_version` and invalidates prior
 consent.
+
+## Performance measurements for all users
+
+`game_session_performance` is created for every Android launch attempt, regardless
+of whether Extended Diagnostics is granted, denied or unknown. A refusal, an
+outdated optional grant or revocation does not stop the collector, clear its
+queue or block delivery/recovery. The event contains no `consent_version`: it
+is a standard measurement, not an assertion of optional consent. The updated
+notice explicitly describes this collection for either choice.
+
+A fresh random attempt UUID is created before launch and reused for
+cumulative revisions at ready, approximately every minute, after a sample, and
+at termination. The API retains only the highest accepted revision. A late ACK
+cannot delete a newer pending revision. Failed and cancelled launches are counted
+even without a ready event. On restart, the last persisted unfinished attempt is
+reported as `interrupted`, never inferred to be a crash.
+
+The [wire fixture](telemetry-contract/game-session-performance-v2.json) enumerates
+all fields: launch timing/outcome, settings and Mac configuration, edition/APK
+version and hash, runtime/profile hashes, observed cache activation, frame-time
+histograms by scene/stage/age, coverage counters, collector wall time, sampled
+emulator RSS, and Mac thermal checks. A missing legacy APK version code is `0`;
+unavailable hashes/exposure/classification are `unknown`.
+
+The collector observes two-second foreground windows at randomized intervals of
+45–75 seconds, with additional backoff targeting at most 1% collection wall-time
+duty. Expensive classification can make intervals several minutes long. The
+initial delay is 5–15 seconds. Background or failed measurements never become
+zero-latency frames. Only the TFT SurfaceView present-to-present histogram is
+used, with a baseline/delta inside each window. This measures presentation in
+the Android guest, not macOS display latency, input latency or network latency.
+
+Screenshots pass through memory to the bundled classifier before and after a
+sample. Matching phase/stage labels form the context; differing endpoints become
+unknown. No image, OCR text, layer name, PID, player name or board contents are
+saved or uploaded. Intermediate transitions are not detectable. Game mode and
+downloaded Riot content are not identified. The classifier recognizes English
+and Russian UI; unsupported or unclear UI remains unknown.
+
+The active checkpoint and at most 16 pending attempts (256 KiB total) live in
+preferences. Pending attempts expire after seven days. Changing the optional
+diagnostics setting leaves collection, pending retries and recovery intact.
+Performance rows have no attached source IP and expire 30 days from
+attempt start, on server startup, subsequent writes or report access. See
+[measurement and rollout plan](performance-telemetry.md) for interpretation and
+the required baseline before judging updates.
 
 ## Server retention and processing
 
@@ -204,7 +252,8 @@ and aggregates are retained for 730 days so delayed delivery of one event ID
 remains idempotent. Eligible source IP records are retained separately for 365
 days only for rate limiting and abuse investigation; they are never used to
 identify, deduplicate, or count installations. Raw
-extended diagnostic events are retained for 365 days. Longer-lived diagnostic
+completed-session diagnostic events are retained for 365 days; performance
+checkpoints for 30 days. Longer-lived diagnostic
 aggregates must avoid small identifiable cohorts.
 
 The release order is server compatibility, schema-v2 verification, public

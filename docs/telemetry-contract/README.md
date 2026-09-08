@@ -3,7 +3,10 @@
 These JSON files are the canonical public wire examples for Mactician telemetry,
 including the legacy first-session event, the fresh activation snapshot, the
 anonymous daily-active heartbeat and per-session summary, and consented extended
-diagnostics.
+diagnostics, plus cumulative `game_session_performance` checkpoints for all users.
+Performance events omit `consent_version` and do not depend on the optional choice.
+Performance uses 85 noncumulative SurfaceFlinger bucket counts per segment;
+the bucket order and semantics are documented in `../performance-telemetry.md`.
 The Swift tests verify the encoded key sets and the private API repository keeps
 byte-identical copies for its HTTP contract tests. Run
 `scripts/verify-telemetry-contract.command` before a server or launcher release.

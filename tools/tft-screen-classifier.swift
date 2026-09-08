@@ -131,15 +131,22 @@ private func loadImage(at url: URL) throws -> CGImage {
     } catch {
         throw ClassifierError.unreadableFile(url.path)
     }
-    guard data.count >= pngSignature.count, data.prefix(pngSignature.count) == pngSignature else {
+    return try decodeImage(data)
+}
+
+private func decodeImage(_ data: Data, telemetryMode: Bool = false) throws -> CGImage {
+    guard data.count <= 32*1024*1024, data.count >= pngSignature.count, data.prefix(pngSignature.count) == pngSignature else {
         throw ClassifierError.notPNG
     }
 
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
           let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
         throw ClassifierError.invalidImage
     }
-    guard supportedDimensions.contains("\(image.width)x\(image.height)") else {
+    // The telemetry path uses normalized scene/phase regions only. The separate
+    // autonomous shop actions remain restricted to their calibrated resolutions.
+    guard supportedDimensions.contains("\(image.width)x\(image.height)")
+        || (telemetryMode && image.width == 1920 && image.height == 1080) else {
         throw ClassifierError.wrongDimensions(image.width, image.height)
     }
     return image
@@ -1005,14 +1012,35 @@ private func main() -> Int32 {
     }
 
     do {
-        let image = try loadImage(at: URL(fileURLWithPath: arguments[0]))
+        let telemetryMode = arguments == ["--telemetry-stdin"]
+        let image: CGImage
+        if telemetryMode {
+            var data = Data()
+            while let chunk = try FileHandle.standardInput.read(upToCount: 65536), !chunk.isEmpty {
+                guard data.count + chunk.count <= 32*1024*1024 else { throw ClassifierError.invalidImage }
+                data.append(chunk)
+            }
+            image = try decodeImage(data, telemetryMode: true)
+        } else {
+            image = try loadImage(at: URL(fileURLWithPath: arguments[0]))
+        }
         let fullFrameLines = try recognizeText(in: image)
         let topStageLines = try recognizeTopStageText(in: image)
         let boardOccupancyLines = try recognizeBoardOccupancyText(in: image)
         let lines = fullFrameLines + topStageLines + boardOccupancyLines
-        emitDebugLines(lines)
+        if !telemetryMode { emitDebugLines(lines) }
         let classification = classify(lines: lines)
         let combatCyanMetrics = combatCyanMetrics(in: image)
+        if telemetryMode {
+            // Do not expose OCR text, player names, evidence or image contents.
+            let phase = battlePhase(for: classification, lines: lines,
+                combatCyanPixels: combatCyanMetrics.pixels, combatCyanLongestRun: combatCyanMetrics.longestRun,
+                imageWidth: image.width, imageHeight: image.height)
+            let result: [String: Any] = ["state": classification.state.rawValue,
+                "stage": classification.stage ?? NSNull(), "phase": phase ?? NSNull()]
+            FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]))
+            return 0
+        }
         let interfaceMatcher = EvidenceMatcher(lines: lines)
         let shopOpen = interfaceMatcher.has("REROLL")
         let occupancy = boardOccupancy(in: lines)

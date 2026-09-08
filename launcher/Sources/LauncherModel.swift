@@ -58,6 +58,8 @@ final class LauncherModel: ObservableObject {
     private let inputBridge = InputBridgeService()
     private let audioRecovery = EmulatorAudioRecoveryService()
     private let fpsOverlay = FPSOverlayService()
+    private var performanceCollector: PerformanceCollector?
+    private var performanceGeneration = UUID()
     private let loginAnimationRepair = RiotLoginAnimationRepairService()
     private var emulatorPID: pid_t?
     private var runtimeHadError = false
@@ -558,6 +560,12 @@ final class LauncherModel: ObservableObject {
                 activeConfiguration = selectedConfiguration
                 status = "Launching TFT…"
                 detail = "Starting the game in \(selectedLanguage.title)."
+                telemetry.beginPerformance(
+                    runtime: .current(paths: paths, edition: selectedEdition, game: gameRelease, effects: effectsQuality),
+                    settings: LauncherTelemetrySettings(profile: profile, effectsQuality: effectsQuality,
+                        uiScalePercent: selectedUIScalePercent, androidMemoryMB: selectedMemoryMB,
+                        androidCPUCores: selectedCPUCores)
+                )
                 try androidRuntime.launch(
                     configuration: .android(AndroidRuntimeLaunchConfiguration(
                         edition: selectedEdition,
@@ -592,6 +600,8 @@ final class LauncherModel: ObservableObject {
                 }
             }
         } catch {
+            telemetry.finishPerformance("launch_failed")
+            stopPerformanceCollector()
             activeRuntimeKind = nil
             let message = selectedRuntimeKind == .nativeIPadExperimental
                 ? NativeIPadDiagnostics.displayMessage(error.localizedDescription)
@@ -608,6 +618,8 @@ final class LauncherModel: ObservableObject {
 
     func stopGame() {
         guard mode == .launching || mode == .playing else { return }
+        stopPerformanceCollector()
+        telemetry.finishPerformance("stopped")
         stopRequested = true
         mode = .stopping
         status = activeRuntimeKind == .nativeIPadExperimental
@@ -816,6 +828,8 @@ final class LauncherModel: ObservableObject {
     }
 
     func shutdown() {
+        stopPerformanceCollector()
+        telemetry.finishPerformance("stopped")
         installer.cancel()
         loginAnimationRepair.stop()
         audioRecovery.stop()
@@ -848,6 +862,7 @@ final class LauncherModel: ObservableObject {
                 status = LauncherL10n.text("native_ipad.running.title")
                 detail = LauncherL10n.text("native_ipad.running.description")
             } else {
+                telemetry.markPerformanceReady()
                 status = "TFT is open"
                 detail = "Space — shop  •  D — reroll  •  F — XP  •  Tab — items/traits  •  V — players/damage  •  Control + Fn + F — fill window."
                 loginAnimationRepair.start(adb: paths.adb, log: paths.launcherLog, packageName: selectedEdition.packageName)
@@ -859,6 +874,18 @@ final class LauncherModel: ObservableObject {
                         log: paths.launcherLog
                     )
                     fpsOverlay.start(targetPID: emulatorPID, adb: paths.adb, packageName: selectedEdition.packageName)
+                    stopPerformanceCollector()
+                    let generation = performanceGeneration
+                    let collector = PerformanceCollector(adb: paths.adb,
+                        classifier: paths.performanceClassifier,
+                        package: selectedEdition.packageName, targetPID: emulatorPID) { [weak self] sample in
+                        DispatchQueue.main.async {
+                            guard let self, self.performanceGeneration == generation else { return }
+                            self.telemetry.recordPerformanceSample(sample)
+                        }
+                    }
+                    performanceCollector = collector
+                    collector.start()
                     inputBridge.start(
                         targetPID: emulatorPID,
                         adb: paths.adb,
@@ -870,6 +897,8 @@ final class LauncherModel: ObservableObject {
             }
         case .error:
             guard !stopRequested || activeRuntimeKind == .nativeIPadExperimental else { return }
+            stopPerformanceCollector()
+            telemetry.finishPerformance("runtime_error")
             let errorMessage = activeRuntimeKind == .nativeIPadExperimental
                 ? NativeIPadDiagnostics.displayMessage(event.message ?? "Runtime error")
                 : event.message ?? "Runtime error"
@@ -885,9 +914,13 @@ final class LauncherModel: ObservableObject {
             activeRuntimeKind = nil
             fail(errorMessage, origin: .runtime)
         case .gameStopped:
+            stopPerformanceCollector()
+            telemetry.finishPerformance("game_exit")
             finishGameSession(showAnnouncement: activeRuntimeKind == .androidEmulator)
             stopGame()
         case .stopped:
+            stopPerformanceCollector()
+            telemetry.finishPerformance(stopRequested ? "stopped" : "game_exit")
             let stoppedRuntime = activeRuntimeKind
             loginAnimationRepair.stop()
             audioRecovery.stop()
@@ -920,6 +953,12 @@ final class LauncherModel: ObservableObject {
         hotkeyEventTapActive = eventTapActive
         hotkeyEventTapAttemptFailed = eventTapAttemptFailed
         refreshHotkeyStatus()
+    }
+
+    private func stopPerformanceCollector() {
+        performanceGeneration = UUID()
+        performanceCollector?.stop()
+        performanceCollector = nil
     }
 
     private func validateAndPersistNativeApplication(at url: URL) {

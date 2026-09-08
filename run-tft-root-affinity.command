@@ -1087,7 +1087,8 @@ fi
             print "ApplicationScale=" scale
         }
     }
-' "$ENGINE_CONFIG_CURRENT" > "$ENGINE_CONFIG_NEXT"
+' "$ENGINE_CONFIG_CURRENT" \
+    | "$PROJECT_DIR/scripts/enable-tft-login-persistence.command" > "$ENGINE_CONFIG_NEXT"
 readonly ENGINE_CONFIG_CONTEXT="$(
     if "$ADB" -s "$SERIAL" shell test -f "$ENGINE_CONFIG"; then
         "$ADB" -s "$SERIAL" shell ls -Zd "$ENGINE_CONFIG"

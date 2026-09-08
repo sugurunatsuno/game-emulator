@@ -1,21 +1,28 @@
 # Changelog
 
-The current application metadata is version 1.1.3, build 48.
+The current application metadata is version 1.2.0, build 49.
 
 ## Unreleased
 
+Planned for 1.3.0: the validated Global Vulkan buffer-view cache.
+
+## 1.2.0 — 2026-09-08
+
+### Added
+
+- Persistent Global / Vietnam (VNG) selection with independent updates and sign-ins.
+- Feedback-board and Lava donation links in the launcher.
+- Performance telemetry for all users, independently of optional diagnostics,
+  including sampled frame times, launch outcomes and coarse scenes processed locally.
+
 ### Changed
 
-- Add a persistent Global / Vietnam (VNG) selector. Each edition installs and
-  updates independently while sharing Android and preserving both sign-ins.
+- Bundle the pinned live TFT 18.1-5423749 split APK set.
 
-- Add an approximate DAU metric backed by at most one unlinkable
-  `daily_active` event per retained preferences domain and UTC day. The event
-  contains no stable identifier, and the server does not retain its source IP.
-- Update the pinned live TFT game and signed update channel to
-  `18.1-5423749`, the latest Riot-signed live build.
-- Enable Riot's built-in Performance Mode with the **Maximum FPS** preset, and
-  disable it again when another graphics-detail preset is selected.
+### Fixed
+
+- Reapply Riot's session-persistence setting before each launch.
+- Honor an immediate Stop before the Android runtime child has been assigned.
 
 ## 1.1.3 — 2026-09-01
 

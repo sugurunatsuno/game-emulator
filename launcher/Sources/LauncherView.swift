@@ -222,13 +222,10 @@ struct LauncherView: View {
             }
             .buttonStyle(LauncherSecondaryButtonStyle())
 
-            Button { } label: {
+            Link(destination: MacticianIdentity.donateURL) {
                 Label(LauncherL10n.text("action.donate"), systemImage: "heart")
             }
             .buttonStyle(LauncherSecondaryButtonStyle())
-            .disabled(true)
-            .help(LauncherL10n.text("action.donate_soon"))
-            .accessibilityHint(LauncherL10n.text("action.donate_soon"))
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, LauncherTheme.Metric.trafficLightReserve)

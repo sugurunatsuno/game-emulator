@@ -131,7 +131,7 @@ final class LauncherTelemetryService {
         _ completion: @escaping (Result<(Data, HTTPURLResponse), Error>) -> Void
     ) -> Void
 
-    static let currentConsentVersion = 1
+    static let currentConsentVersion = 2
     static let currentSnapshotVersion = 1
 
     private enum Constant {
@@ -143,10 +143,12 @@ final class LauncherTelemetryService {
         static let dailyActivePendingEventsKey = "telemetry.dailyActive.pendingEvents.v1"
         static let dailyActiveLastCreatedDayKey = "telemetry.dailyActive.lastCreatedDay.v1"
         static let sessionSummaryPendingEventsKey = "telemetry.sessionSummary.pendingEvents.v2"
-        static let noticeShownKey = "telemetry.noticeShown.v3"
+        static let noticeShownKey = "telemetry.noticeShown.v4"
         static let extendedConsentStateKey = "telemetry.extendedConsent.state.v1"
         static let extendedConsentVersionKey = "telemetry.extendedConsent.version.v1"
         static let extendedPendingEventsKey = "telemetry.extended.pendingEvents.v2"
+        static let performancePendingKey = "telemetry.performance.pending.v1"
+        static let performanceActiveKey = "telemetry.performance.active.v1"
         static let legacyPendingEventsKey = "telemetry.pendingEvents.v1"
         static let legacyInstallationIDKey = "telemetry.installationID.v1"
         static let shownMessagesKey = "telemetry.shownMessages.v1"
@@ -282,6 +284,7 @@ final class LauncherTelemetryService {
         case dailyActive(DailyActiveEvent)
         case sessionSummary(GameSessionSummaryEvent)
         case diagnostics(DiagnosticsEvent)
+        case performance(PerformanceEvent)
 
         var eventID: String {
             switch self {
@@ -290,6 +293,7 @@ final class LauncherTelemetryService {
             case let .dailyActive(event): return event.eventID
             case let .sessionSummary(event): return event.eventID
             case let .diagnostics(event): return event.eventID
+            case let .performance(event): return event.eventID
             }
         }
     }
@@ -322,6 +326,27 @@ final class LauncherTelemetryService {
     private let device: LauncherTelemetryDevice
     private let loader: Loader
     private var isFlushing = false
+    private var performanceActive: PerformanceEvent?
+    private var performanceStartedUptime: TimeInterval?
+    private var performanceTimer: DispatchSourceTimer?
+
+    private struct PerformanceEvent: Codable {
+        let schemaVersion: Int
+        let eventID: String
+        let event: String
+        let occurredAt: Date
+        let launcherVersion: String
+        let launcherBuild: String
+        let launcherSettings: LauncherTelemetrySettings
+        let device: LauncherTelemetryDevice
+        var performance: PerformanceSnapshot
+        enum CodingKeys: String, CodingKey {
+            case event, device, performance
+            case schemaVersion = "schema_version", eventID = "event_id", occurredAt = "occurred_at"
+            case launcherVersion = "launcher_version", launcherBuild = "launcher_build"
+            case launcherSettings = "launcher_settings"
+        }
+    }
 
     init(
         defaults: UserDefaults = .standard,
@@ -353,6 +378,7 @@ final class LauncherTelemetryService {
         discardExpiredFirstSession(now: Date())
         queue.async { [weak self] in
             guard let self else { return }
+            self.recoverPerformance()
             self.createActivationSnapshotIfNeeded()
             if !self.shouldShowNotice {
                 self.createDailyActiveIfNeeded(on: Date())
@@ -435,6 +461,114 @@ final class LauncherTelemetryService {
         }
     }
 
+    func beginPerformance(runtime: PerformanceRuntime, settings: LauncherTelemetrySettings) {
+        queue.sync {
+            guard performanceActive == nil else { return }
+            performanceStartedUptime = ProcessInfo.processInfo.systemUptime
+            performanceActive = PerformanceEvent(schemaVersion: 2, eventID: UUID().uuidString.lowercased(),
+                event: "game_session_performance", occurredAt: Date(), launcherVersion: launcherVersion,
+                launcherBuild: launcherBuild,
+                launcherSettings: settings, device: device, performance: PerformanceSnapshot(runtime: runtime))
+            persistPerformance()
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now() + 60, repeating: 60, leeway: .seconds(3))
+            timer.setEventHandler { [weak self] in
+                guard let self, self.performanceActive != nil else { return }
+                self.updatePerformanceClock()
+                self.persistPerformance()
+            }
+            performanceTimer = timer
+            timer.resume()
+        }
+    }
+
+    func markPerformanceReady() {
+        queue.sync {
+            guard performanceActive != nil, performanceActive?.performance.readyMS == nil else { return }
+            updatePerformanceClock()
+            let readyMS = performanceActive?.performance.elapsedMS
+            performanceActive?.performance.readyMS = readyMS
+            performanceActive?.performance.status = "running"
+            persistPerformance()
+        }
+    }
+
+    func recordPerformanceSample(_ sample: PerformanceSample) {
+        queue.async { [weak self] in
+            guard let self, self.performanceActive != nil else { return }
+            self.updatePerformanceClock()
+            self.performanceActive?.performance.record(sample)
+            self.persistPerformance()
+        }
+    }
+
+    func finishPerformance(_ status: String) {
+        queue.sync {
+            guard performanceActive != nil else { return }
+            updatePerformanceClock()
+            let effectiveStatus = performanceActive?.performance.readyMS == nil
+                ? (status == "stopped" ? "cancelled" : "launch_failed") : status
+            performanceActive?.performance.status = effectiveStatus
+            persistPerformance()
+            performanceActive = nil; performanceStartedUptime = nil
+            defaults.removeObject(forKey: Constant.performanceActiveKey)
+            performanceTimer?.cancel(); performanceTimer = nil
+            _ = defaults.synchronize()
+        }
+    }
+
+    private func updatePerformanceClock() {
+        guard let began = performanceStartedUptime else { return }
+        performanceActive?.performance.elapsedMS = min(604_800_000, max(0, Int64((ProcessInfo.processInfo.systemUptime - began) * 1000)))
+        performanceActive?.performance.revision += 1
+    }
+
+    private func persistPerformance() {
+        guard let event = performanceActive else { return }
+        if let data = Self.eventEncoder.encodeOrNil(event), data.count <= 32*1024 {
+            defaults.set(data, forKey: Constant.performanceActiveKey)
+            var pending = loadPerformanceEvents().filter { $0.eventID != event.eventID }
+            pending.append(event)
+            savePerformanceEvents(pending)
+            _ = defaults.synchronize()
+            flushNextEvent()
+        }
+    }
+
+    private func recoverPerformance() {
+        defer { defaults.removeObject(forKey: Constant.performanceActiveKey) }
+        guard let data = defaults.data(forKey: Constant.performanceActiveKey), data.count <= 32*1024,
+              var event = try? Self.eventDecoder.decode(PerformanceEvent.self, from: data),
+              Date().timeIntervalSince(event.occurredAt) <= 7*24*60*60 else { return }
+        // Preserve the last measured elapsed time; time while the launcher was
+        // dead/sleeping must not become gameplay or a confirmed crash.
+        if !event.performance.terminal {
+            event.performance.revision += 1
+            event.performance.status = "interrupted"
+        }
+        var events = loadPerformanceEvents().filter { $0.eventID != event.eventID }
+        events.append(event)
+        savePerformanceEvents(events)
+    }
+
+    private func loadPerformanceEvents() -> [PerformanceEvent] {
+        guard let data = defaults.data(forKey: Constant.performancePendingKey), data.count <= 256*1024,
+              let events = try? Self.eventDecoder.decode([PerformanceEvent].self, from: data) else { return [] }
+        return events.filter { Date().timeIntervalSince($0.occurredAt) <= 7*24*60*60 }
+    }
+
+    private func savePerformanceEvents(_ values: [PerformanceEvent]) {
+        var events = Array(values.suffix(16))
+        while !events.isEmpty {
+            if let data = Self.eventEncoder.encodeOrNil(events), data.count <= 256*1024 {
+                defaults.set(data, forKey: Constant.performancePendingKey); return
+            }
+            events.removeFirst()
+        }
+        defaults.removeObject(forKey: Constant.performancePendingKey)
+    }
+
+
     func fetchAnnouncement(
         trigger: LauncherMessageTrigger,
         completion: @escaping (LauncherAnnouncement?) -> Void
@@ -506,6 +640,8 @@ final class LauncherTelemetryService {
             pending = .dailyActive(dailyActive)
         } else if let summary = loadSessionSummaryEvents().first {
             pending = .sessionSummary(summary)
+        } else if let performance = loadPerformanceEvents().first {
+            pending = .performance(performance)
         } else if isExtendedDiagnosticsEnabled {
             pending = loadDiagnosticsEvents().first.map(PendingEvent.diagnostics)
         } else {
@@ -524,6 +660,8 @@ final class LauncherTelemetryService {
         case let .sessionSummary(value):
             body = Self.eventEncoder.encodeOrNil(value)
         case let .diagnostics(value):
+            body = Self.eventEncoder.encodeOrNil(value)
+        case let .performance(value):
             body = Self.eventEncoder.encodeOrNil(value)
         }
         guard let url = URL(string: "v1/events", relativeTo: apiBaseURL)?.absoluteURL,
@@ -741,6 +879,8 @@ final class LauncherTelemetryService {
             removePendingEvent(pending)
         case .diagnostics:
             removePendingEvent(pending)
+        case .performance:
+            removePendingEvent(pending)
         }
     }
 
@@ -769,6 +909,12 @@ final class LauncherTelemetryService {
             saveDiagnosticsEvents(
                 loadDiagnosticsEvents().filter { $0.eventID != pending.eventID }
             )
+        case let .performance(sent):
+            // An acknowledgement for revision N must not delete N+1, which may
+            // have been persisted while the request was in flight.
+            savePerformanceEvents(loadPerformanceEvents().filter {
+                $0.eventID != sent.eventID || $0.performance.revision > sent.performance.revision
+            })
         }
     }
 

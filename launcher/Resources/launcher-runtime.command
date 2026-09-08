@@ -52,6 +52,10 @@ emit '{"event":"booting","message":"Starting Android…"}'
 
 "$TFT_RUNTIME_PROJECT/scripts/run-asg-experiment.command" >>"$TFT_LAUNCH_LOG" 2>&1 &
 child_pid=$!
+# STOP can arrive after the booting event but before the child PID is assigned.
+if (( stop_requested == 1 )); then
+    stop_child
+fi
 
 typeset emulator_pid=""
 typeset emitted_pid=0

@@ -19,7 +19,7 @@ Built for two tacticians. Shared with everyone.
 
 ## Project status
 
-- Version: **1.1.3** (build 48)
+- Version: **1.2.0** (build 49)
 - Host architecture: **Apple Silicon (`arm64`)**
 - Minimum deployment target: **macOS 12.0**, enforced by the build target and
   runtime preflight
@@ -53,6 +53,7 @@ is configured independently.
   without clearing unrelated app data.
 - Provides game hotkeys for shop, reroll, XP, item/trait and player/damage tabs,
   plus the macOS window-fill shortcut.
+- Links to the feedback board and [donations](https://app.lava.top/mactician?tabId=donate).
 - Uses a Sparkle appcast with Ed25519 archive verification for updates; public
   releases are Developer ID signed and Apple-notarized.
 - Sends minimized activation events, a versioned one-time fresh census, and an
@@ -93,7 +94,7 @@ Verify the version, build number,
 and the SHA-256 published with that release before opening it.
 
 1. Open the DMG and drag **Mactician** to **Applications**.
-2. Open it. Version 1.1.3 is signed with Apple Developer ID and notarized, so
+2. Open it. Version 1.2.0 is signed with Apple Developer ID and notarized, so
    Gatekeeper can verify it normally without **Open Anyway**.
 3. Review and accept the Android SDK terms, then choose **Install**. About
    2.3 GB is downloaded before extraction and AVD provisioning.
@@ -133,7 +134,7 @@ TFT_GAME_APK_DIR="$PROJECT_DIR/private/tft-apks" \
 ```
 
 This produces `dist/Mactician.app` and
-`dist/Mactician-1.1.3.dmg`, signed ad hoc for local validation.
+`dist/Mactician-1.2.0.dmg`, signed ad hoc for local validation.
 
 ### Provisioning integration test
 
@@ -245,14 +246,20 @@ server immediately aggregates session count and play time by received UTC day,
 does not retain the raw payload or its source IP, and cannot link separate
 sessions into an installation history.
 
-With explicit opt-in only, every completed session additionally sends a separate
-diagnostic event with exact duration, applied graphics/resource settings, Mac
-model identifier, macOS version, total memory, and logical CPU count. Every
-session has an independent event UUID and no installation ID. Turning the
-setting off immediately deletes its local retry queue. Neither level contains a
-Mac name, serial number, MAC address, Apple/Riot identity, logs, game state, or
-AVD data. See [Telemetry and privacy](docs/telemetry.md) for the complete fields,
-limitations, consent behavior, and retention periods.
+Every Android launch sends performance checkpoints for all users, independently
+of Extended Diagnostics. These include Mac configuration, launcher settings,
+game/runtime versions, launch outcomes, sampled frame times, coarse scene
+labels, emulator memory and Mac thermal state. Screenshots are classified
+locally in memory and are never saved or uploaded. Each attempt has a fresh
+random UUID, without a stable installation or user ID, and its latest checkpoint
+is retained for 30 days without an attached source IP.
+
+Optional Extended Diagnostics adds separate detailed completed-session rows,
+retained for 365 days. Turning that setting off stops those optional rows and
+clears their retry queue; performance metrics, activity and session summaries
+continue. No event contains a Mac name, serial number, MAC address, Apple/Riot
+identity, logs, screenshots or AVD contents. See
+[Telemetry and privacy](docs/telemetry.md) for fields and retention.
 
 The same HTTPS API can return a title, text, and optional PNG/JPEG for a popup
 when the launcher starts or a game closes. Responses, redirects, image origin,

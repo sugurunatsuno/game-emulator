@@ -114,6 +114,19 @@ copy_plain_file "$LAUNCHER_DIR/Resources/Mactician.icns" "$RESOURCES/Mactician.i
 copy_plain_file "$LAUNCHER_DIR/Resources/release-manifest.json" "$RESOURCES/release-manifest.json"
 copy_plain_file "$LAUNCHER_DIR/Resources/MacticianHero.png" "$RESOURCES/MacticianHero.png"
 copy_plain_file "$LAUNCHER_DIR/Resources/launcher-runtime.command" "$RESOURCES/launcher-runtime.command"
+TFT_SCREEN_CLASSIFIER_BINARY="$HELPERS/tft-screen-classifier" \
+    "$PROJECT_DIR/scripts/build-tft-screen-classifier.command" >/dev/null
+# Fingerprint bundled runtime inputs independently from the launcher version.
+(
+    cd "$PROJECT_DIR"
+    shasum -a 256 run-tft-root-affinity.command run-tft-angle-opengl.command \
+        scripts/run-asg-experiment.command scripts/enable-tft-login-persistence.command \
+        launcher/Resources/release-manifest.json launcher/Resources/launcher-runtime.command \
+        launcher/Resources/emulator-host.command launcher/Sources/InputBridgeService.swift \
+        launcher/Sources/PerformanceCollector.swift launcher/Sources/PerformanceModels.swift \
+        launcher/Sources/LauncherModel.swift launcher/Sources/LauncherTelemetryService.swift \
+        tools/tft-screen-classifier.swift
+) | shasum -a 256 | awk '{print $1}' > "$RESOURCES/performance-runtime.sha256"
 copy_plain_file "$LAUNCHER_DIR/Resources/QEMU-Hypervisor.entitlements" "$RESOURCES/QEMU-Hypervisor.entitlements"
 copy_plain_file "$SPARKLE_LICENSE_SOURCE" "$THIRD_PARTY_LICENSES/Sparkle-LICENSE.txt"
 chmod 755 "$RESOURCES/launcher-runtime.command"
@@ -144,6 +157,7 @@ copy_plain_file "$PROJECT_DIR/run-tft-angle-opengl.command" "$RUNTIME_TEMPLATE/r
 copy_plain_file "$PROJECT_DIR/scripts/run-asg-experiment.command" "$RUNTIME_TEMPLATE/scripts/run-asg-experiment.command"
 copy_plain_file "$PROJECT_DIR/scripts/watch-root-pso.command" "$RUNTIME_TEMPLATE/scripts/watch-root-pso.command"
 copy_plain_file "$PROJECT_DIR/scripts/update-tft-performance-mode.command" "$RUNTIME_TEMPLATE/scripts/update-tft-performance-mode.command"
+copy_plain_file "$PROJECT_DIR/scripts/enable-tft-login-persistence.command" "$RUNTIME_TEMPLATE/scripts/enable-tft-login-persistence.command"
 copy_plain_file "$PROJECT_DIR/scripts/android-environment.sh" "$RUNTIME_TEMPLATE/scripts/android-environment.sh"
 copy_plain_file "$PROJECT_DIR/artifacts/tft-pbe-18.1-5212127-angle-opengl/Android_Codex.DeviceProfiles.shader-prewarm.ini" \
     "$RUNTIME_TEMPLATE/artifacts/tft-18.1-angle-opengl/Android_Codex.DeviceProfiles.shader-prewarm.ini"
@@ -159,6 +173,7 @@ chmod 755 \
     "$RUNTIME_TEMPLATE/scripts/run-asg-experiment.command" \
     "$RUNTIME_TEMPLATE/scripts/watch-root-pso.command" \
     "$RUNTIME_TEMPLATE/scripts/update-tft-performance-mode.command" \
+    "$RUNTIME_TEMPLATE/scripts/enable-tft-login-persistence.command" \
     "$RUNTIME_TEMPLATE/scripts/android-environment.sh"
 
 if rg -n '/Users/[[:alnum:]_.-]+/' "$APP_CONTENTS"; then
@@ -185,6 +200,8 @@ trap cleanup_signing_root EXIT
 cp -R -X "$APP" "$SIGNING_APP"
 if (( PUBLIC_RELEASE == 1 )); then
     codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
+        "$SIGNING_APP/Contents/Helpers/tft-screen-classifier"
+    codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
         "$SIGNING_SPARKLE_VERSION/Autoupdate"
     codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
         "$SIGNING_SPARKLE_VERSION/Updater.app"
@@ -199,6 +216,8 @@ if (( PUBLIC_RELEASE == 1 )); then
     codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime \
         "$SIGNING_APP"
 else
+    codesign --force --sign - --timestamp=none --options runtime \
+        "$SIGNING_APP/Contents/Helpers/tft-screen-classifier"
     codesign --force --sign - --timestamp=none --options runtime \
         "$SIGNING_SPARKLE_VERSION/Autoupdate"
     codesign --force --sign - --timestamp=none --options runtime \

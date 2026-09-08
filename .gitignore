@@ -34,6 +34,7 @@ hardware-qemu.ini.lock
 # Measurements, logs, traces, and crash data
 /measurements/
 *.log
+!/scripts/test-fixtures/unreal-startup/TFT.log
 logcat*.txt
 *.trace
 *.perfetto-trace

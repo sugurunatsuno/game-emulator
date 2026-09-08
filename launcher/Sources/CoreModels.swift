@@ -9,6 +9,7 @@ enum MacticianIdentity {
     static let loggingSubsystem = bundleIdentifier
     static let websiteURL = URL(string: "https://sergeinaumov.dev/mactician")!
     static let feedbackURL = URL(string: "https://sergeinaumov.dev/mactician/feedback")!
+    static let donateURL = URL(string: "https://app.lava.top/mactician?tabId=donate")!
     static let privacyPolicyURL = URL(string: "https://sergeinaumov.dev/mactician/privacy")!
     static let extendedDiagnosticsURL = URL(
         string: "https://sergeinaumov.dev/mactician/privacy#extended-diagnostics"

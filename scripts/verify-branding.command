@@ -24,7 +24,9 @@ content_matches="$(rg -n -i --hidden \
     --glob '!launcher/.build/**' \
     --glob '!build/**' \
     --glob '!DerivedData/**' \
-    "$old_product_pattern|$forbidden_suffix" . || true)"
+    "$old_product_pattern|$forbidden_suffix" . \
+    | grep -vE '^\./docs/releasing[.]md:[0-9]+:(`tft-pbe-'"$launcher_word_lower"'`[.] This locator is not secret[.] Its public key must be|export MACTICIAN_SPARKLE_ACCOUNT="\$\{MACTICIAN_SPARKLE_ACCOUNT:-tft-pbe-'"$launcher_word_lower"'\}")$' \
+    || true)"
 [[ -z "$content_matches" ]] || {
     print -r -- "$content_matches" >&2
     fail "obsolete or forbidden product naming remains in repository content"

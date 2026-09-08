@@ -205,13 +205,14 @@ enum LauncherTests {
             "telemetry device model identifier is bounded"
         )
         let currentUTCDay = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        try testPerformanceTelemetry(sourceRoot: sourceRoot, settings: telemetrySettings, device: telemetryDevice)
 
         let dailyDefaultsName = "LauncherTests.daily-active.\(UUID().uuidString)"
         guard let dailyDefaults = UserDefaults(suiteName: dailyDefaultsName) else {
             throw TestFailure("daily-active UserDefaults suite")
         }
         defer { dailyDefaults.removePersistentDomain(forName: dailyDefaultsName) }
-        dailyDefaults.set(true, forKey: "telemetry.noticeShown.v3")
+        dailyDefaults.set(true, forKey: "telemetry.noticeShown.v4")
         dailyDefaults.set("denied", forKey: "telemetry.extendedConsent.state.v1")
         dailyDefaults.set(1, forKey: "telemetry.extendedConsent.version.v1")
         dailyDefaults.set(true, forKey: "telemetry.firstSession.completed.v2")
@@ -468,7 +469,7 @@ enum LauncherTests {
                 && deniedSnapshot["event"] as? String == "activation_snapshot"
                 && (deniedSnapshot["snapshot_version"] as? NSNumber)?.intValue == 1
                 && deniedSnapshot["diagnostics_consent_state"] as? String == "denied"
-                && (deniedSnapshot["diagnostics_consent_version"] as? NSNumber)?.intValue == 1
+                && (deniedSnapshot["diagnostics_consent_version"] as? NSNumber)?.intValue == 2
                 && Set(deniedSnapshot.keys) == Set([
                     "schema_version", "event_id", "event", "snapshot_version",
                     "diagnostics_consent_state", "diagnostics_consent_version",
@@ -554,7 +555,7 @@ enum LauncherTests {
         )
         grantedDefaults.set(true, forKey: "telemetry.firstSession.completed.v2")
         grantedDefaults.set("granted", forKey: "telemetry.extendedConsent.state.v1")
-        grantedDefaults.set(1, forKey: "telemetry.extendedConsent.version.v1")
+        grantedDefaults.set(2, forKey: "telemetry.extendedConsent.version.v1")
         let grantedLoader = TelemetryLoaderStub()
         let grantedService = LauncherTelemetryService(
             defaults: grantedDefaults,
@@ -610,7 +611,7 @@ enum LauncherTests {
         }
         try expect(
             diagnosticsEvent["event"] as? String == "game_session_diagnostics"
-                && (diagnosticsEvent["consent_version"] as? NSNumber)?.intValue == 1
+                && (diagnosticsEvent["consent_version"] as? NSNumber)?.intValue == 2
                 && (diagnosticsEvent["duration_seconds"] as? NSNumber)?.int64Value == 2_871
                 && settingsPayload["profile_id"] as? String == "quality"
                 && settingsPayload["effects_quality_id"] as? String == "performance"
@@ -906,8 +907,8 @@ enum LauncherTests {
             "app bundle identifier"
         )
         try expect(infoPlist["CFBundleIconFile"] as? String == "Mactician.icns", "launcher icon name")
-        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.1.3", "launcher version")
-        try expect(infoPlist["CFBundleVersion"] as? String == "48", "launcher build")
+        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.2.0", "launcher version")
+        try expect(infoPlist["CFBundleVersion"] as? String == "49", "launcher build")
         try expect(
             infoPlist["SUFeedURL"] as? String == "https://sergeinaumov.dev/mactician/updates/appcast.xml",
             "Sparkle appcast URL"
@@ -1005,10 +1006,10 @@ enum LauncherTests {
             "emulator host icon name"
         )
         try expect(
-            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.1.3",
+            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.2.0",
             "emulator host version"
         )
-        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "48", "emulator host build")
+        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "49", "emulator host build")
         try expect(
             emulatorHostInfo["CFBundleIdentifier"] as? String
                 == "dev.sergeinaumov.mactician.game-host",
@@ -2279,6 +2280,100 @@ enum LauncherTests {
         ) else { return [] }
         return enumerator.compactMap { $0 as? URL }.filter {
             (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+    }
+
+    private static func testPerformanceTelemetry(sourceRoot: URL, settings: LauncherTelemetrySettings, device: LauncherTelemetryDevice) throws {
+        let fixtureURL = sourceRoot.deletingLastPathComponent().appendingPathComponent("docs/telemetry-contract/game-session-performance-v2.json")
+        let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL)) as! [String: Any]
+        let performanceJSON = fixture["performance"] as! [String: Any]
+        let snapshot = try JSONDecoder().decode(PerformanceSnapshot.self, from: JSONSerialization.data(withJSONObject: performanceJSON))
+        let roundTrip = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as! NSDictionary
+        try expect(roundTrip == performanceJSON as NSDictionary, "Swift performance payload agrees with API fixture")
+        let histogram = snapshot.segments[0].histogram
+        let row = zip(SurfaceFlingerTimeStats.buckets, histogram).map { "\($0)ms=\($1)" }.joined(separator: " ")
+        let package = GameEdition.global.packageName
+        let layerName = "SurfaceView[\(package)/com.epicgames.unreal.GameActivity](BLAST)#123"
+        let raw = "presentToPresent histogram is as below:\n\(row)\nlayerName = \(layerName)\npresent2present histogram is as below:\n\(row)\n"
+        guard let layer = SurfaceFlingerTimeStats.parse(raw, package: package) else { throw TestFailure("parse TFT histogram") }
+        try expect(layer.histogram == histogram, "global compositor histogram is ignored")
+        try expect(SurfaceFlingerTimeStats.parse(raw + raw, package: package) == nil, "ambiguous TFT layers rejected")
+        try expect(SurfaceFlingerTimeStats.parse(raw, package: GameEdition.vietnam.packageName) == nil, "other edition layer rejected")
+        let baseline = SurfaceFlingerTimeStats.Layer(name: layerName, histogram: [Int64](repeating: 0, count: histogram.count))
+        try expect(SurfaceFlingerTimeStats.delta(before: baseline, after: layer) == histogram, "counter subtraction")
+        try expect(SurfaceFlingerTimeStats.delta(before: layer, after: baseline) == nil, "counter resets are missing, not fast frames")
+        try expect(SurfaceFlingerTimeStats.delta(before: layer, after: layer) == nil, "zero frames are missing, not a good sample")
+        let combat = PerformanceScene.decode(Data(#"{"state":"battle","stage":"4-2","phase":"combat"}"#.utf8))
+        try expect(combat.scene == "combat" && combat.stageBand == "late", "bounded scene decoding")
+        try expect(PerformanceScene.bracket(combat, PerformanceScene(scene: "planning", stage: "4-2")).scene == "unknown", "phase transitions unclassified")
+        try expect(PerformanceScene.bracket(combat, PerformanceScene(scene: "combat", stage: "4-3")).scene == "unknown", "round transitions unclassified")
+        var accumulation = PerformanceSnapshot(runtime: snapshot.runtime)
+        accumulation.readyMS = 1000; accumulation.elapsedMS = 100000
+        accumulation.record(PerformanceSample(histogram: histogram, durationMS: 2000, scene: combat, collectorMS: 10, residentMB: 100, thermalState: 0))
+        accumulation.record(PerformanceSample(background: true))
+        accumulation.record(PerformanceSample())
+        try expect(accumulation.windowsAttempted == 2 && accumulation.windowsMissing == 1 && accumulation.backgroundSkipped == 1 && accumulation.segments[0].ageBand == "early", "coverage denominators remain separate")
+        accumulation.record(PerformanceSample(histogram: [1], durationMS: 2000))
+        try expect(accumulation.windowsMissing == 2 && accumulation.segments[0].windows == 1, "invalid histograms cannot poison the cumulative attempt")
+
+        for (state, version) in [("unknown", 0), ("denied", 1), ("denied", 2), ("granted", 1), ("granted", 2)] {
+            let suite = "LauncherTests.performance.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(true, forKey: "telemetry.noticeShown.v4")
+            defaults.set(state, forKey: "telemetry.extendedConsent.state.v1")
+            defaults.set(version, forKey: "telemetry.extendedConsent.version.v1")
+            defaults.set(true, forKey: "telemetry.firstSession.completed.v2")
+            defaults.set(true, forKey: "telemetry.activationSnapshot.completed.v1")
+            defaults.set(String(ISO8601DateFormatter().string(from: Date()).prefix(10)), forKey: "telemetry.dailyActive.lastCreatedDay.v1")
+            let loader = TelemetryLoaderStub()
+            let service = LauncherTelemetryService(defaults: defaults, apiBaseURL: URL(string: "https://127.0.0.1:1/")!, device: device, loader: loader.load)
+            service.beginPerformance(runtime: snapshot.runtime, settings: settings)
+            try waitFor("performance starts for \(state) version \(version)") { loader.requestCount == 1 }
+            let starting = loader.event(at: 0)!
+            try expect(starting["event"] as? String == "game_session_performance", "attempt exists before ready for every diagnostics choice")
+            try expect(Set(starting.keys) == Set(fixture.keys) && starting["consent_version"] == nil, "basic performance wire contract never claims consent")
+            service.markPerformanceReady()
+            service.recordPerformanceSample(PerformanceSample(histogram: histogram, durationMS: 2000, scene: combat))
+            service.setExtendedDiagnosticsEnabled(false)
+            try expect(defaults.data(forKey: "telemetry.performance.active.v1") != nil, "refusal preserves the active performance attempt")
+            service.recordPerformanceSample(PerformanceSample(histogram: histogram, durationMS: 2000, scene: combat))
+            service.finishPerformance("stopped")
+            func pending() throws -> [[String: Any]] {
+                guard let data = defaults.data(forKey: "telemetry.performance.pending.v1") else { return [] }
+                return try JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+            }
+            let final = try pending()
+            let finalPerformance = final[0]["performance"] as! [String: Any]
+            try expect(final.count == 1 && finalPerformance["status"] as? String == "stopped", "checkpoints coalesce and final persists after refusal")
+            try expect(finalPerformance["windows_attempted"] as? Int == 2, "samples continue after disabling optional diagnostics")
+            loader.completeFirst(statusCode: 202)
+            try waitFor("newer checkpoint survives older ACK") { loader.requestCount == 2 }
+            try expect(loader.event(at: 1)?["event_id"] as? String == starting["event_id"] as? String, "revisions keep one attempt ID")
+            try expect(try pending().count == 1, "old ACK did not delete final revision")
+            loader.completeFirst(statusCode: 202)
+            try waitFor("performance final is delivered after refusal") { defaults.data(forKey: "telemetry.performance.pending.v1") == nil }
+            service.recordGameSession(durationSeconds: 120, launcherSettings: settings)
+            try expect(defaults.data(forKey: "telemetry.extended.pendingEvents.v2") == nil, "optional completed-session diagnostics remain disabled")
+
+            service.beginPerformance(runtime: snapshot.runtime, settings: settings)
+            service.finishPerformance("launch_failed")
+            try expect((try pending().last!["performance"] as! [String: Any])["status"] as? String == "launch_failed", "failed launches survive refusal without ready")
+            service.beginPerformance(runtime: snapshot.runtime, settings: settings)
+            service.markPerformanceReady()
+            let interrupted = defaults.data(forKey: "telemetry.performance.active.v1")!
+            service.finishPerformance("stopped")
+            // Recover an unfinished attempt while an old optional grant becomes unknown.
+            defaults.set(interrupted, forKey: "telemetry.performance.active.v1")
+            defaults.set("granted", forKey: "telemetry.extendedConsent.state.v1")
+            defaults.set(1, forKey: "telemetry.extendedConsent.version.v1")
+            let recovered = LauncherTelemetryService(defaults: defaults, apiBaseURL: URL(string: "https://127.0.0.1:1/")!, device: device, loader: TelemetryLoaderStub().load)
+            recovered.finishPerformance("stopped")
+            try expect(!recovered.isExtendedDiagnosticsEnabled && recovered.shouldShowNotice, "old optional grants still need an updated choice")
+            try expect((try pending().last!["performance"] as! [String: Any])["status"] as? String == "interrupted", "consent migration preserves interrupted performance recovery")
+            recovered.beginPerformance(runtime: snapshot.runtime, settings: settings)
+            recovered.finishPerformance("launch_failed")
+            try expect((try pending().last!["performance"] as! [String: Any])["status"] as? String == "launch_failed", "unknown diagnostics choice still creates performance attempts")
         }
     }
 

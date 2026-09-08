@@ -193,7 +193,7 @@ consent. Each summary uses a fresh event UUID and contains no occurrence time,
 settings, device properties, or stable identifier.
 
 An independent, bounded queue stores `game_session_diagnostics` only while
-consent version 1 is granted. Revocation synchronously removes that queue before
+consent version 2 is granted. Revocation synchronously removes that queue before
 another request can begin. Diagnostic events contain applied launcher settings
 and coarse host properties, but receive independent event UUIDs and no
 installation identifier. On migration, the legacy installation UUID and queued
@@ -245,3 +245,8 @@ missing Hypervisor support, an unexpected game version, invalid overlay/profile
 hashes, unknown graphics transport, conflicting AVD ownership, incomplete
 rollback, unknown autonomous UI states, visible CAPTCHA/MFA, or an unsigned
 production update build. Recovery never silently patches an unknown game build.
+
+Performance checkpoints and the foreground collector are independent of that
+optional queue. Every Android attempt records runtime, device/settings, timing
+and sampled frame data; refusal or consent migration does not stop or discard
+performance events. The performance wire event has no consent-version field.

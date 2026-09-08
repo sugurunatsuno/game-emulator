@@ -1,0 +1,5 @@
+[2026.08.15-00.00.00:000][  0]LogDeviceProfileManager: Pushing Device Profile CVar: [[r.ScreenPercentage:67]]
+[2026.08.15-00.00.00:001][  0]LogDeviceProfileManager: Pushing Device Profile CVar: [[r.Upscale.Quality:1]]
+[2026.08.15-00.00.00:002][  0]LogDeviceProfileManager: Pushing Device Profile CVar: [[a.Budget.BudgetMs:1.5]]
+[2026.08.15-00.00.00:003][  0]LogConsoleManager: Warning: Setting the console variable 'r.Upscale.Quality' with 'SetByScalability' was ignored as it is lower priority than the previous 'SetByDeviceProfile'. Value remains '1'
+[2026.08.15-00.00.00:004][  0]LogConsoleManager: Warning: Setting the console variable 'a.Budget.BudgetMs' with 'SetByScalability' was ignored as it is lower priority than the previous 'SetByDeviceProfile'. Value remains '1.5'

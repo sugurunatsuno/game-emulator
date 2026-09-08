@@ -71,6 +71,7 @@ for syntax_script in \
         "$PROJECT_DIR/scripts/build-android-egl-capability-probe.command" \
         "$PROJECT_DIR/scripts/watch-root-pso.command" \
         "$PROJECT_DIR/scripts/update-tft-performance-mode.command" \
+        "$PROJECT_DIR/scripts/enable-tft-login-persistence.command" \
         "$PROJECT_DIR/scripts/android-environment.sh" \
         "$PROJECT_DIR/scripts/prepare-sparkle.command" \
         "$PROJECT_DIR/scripts/publish-mactician-update.command" \
@@ -79,6 +80,42 @@ for syntax_script in \
         "$PROJECT_DIR/scripts/integration-test-mactician.command"; do
     zsh -o NO_BG_NICE -n "$syntax_script"
 done
+
+python3 "$PROJECT_DIR/scripts/test-runtime-early-stop.py" "$LAUNCHER_DIR/Resources/launcher-runtime.command"
+
+readonly LOGIN_PERSISTENCE_FIXTURE="$LIFECYCLE_ROOT/Engine.login.ini"
+readonly LOGIN_PERSISTENCE_ENABLED="$LIFECYCLE_ROOT/Engine.login-enabled.ini"
+readonly LOGIN_PERSISTENCE_REPEATED="$LIFECYCLE_ROOT/Engine.login-repeated.ini"
+cat > "$LOGIN_PERSISTENCE_FIXTURE" <<'LOGIN_PERSISTENCE_EOF'
+[/Script/Engine.UserInterfaceSettings]
+ApplicationScale=1.25
+bPersistLogin=UnrelatedValue
+
+ [/Script/OnlineSubsystemRiot.RGIOPRiotGamesApiSettings]
+ bPersistLogin = False
+bEnableDebugLogging=False
+
+[/Script/OnlineSubsystemRiot.RGIOPRiotGamesApiSettings]
+bPersistLogin=False
+LOGIN_PERSISTENCE_EOF
+"$PROJECT_DIR/scripts/enable-tft-login-persistence.command" \
+    < "$LOGIN_PERSISTENCE_FIXTURE" > "$LOGIN_PERSISTENCE_ENABLED"
+"$PROJECT_DIR/scripts/enable-tft-login-persistence.command" \
+    < "$LOGIN_PERSISTENCE_ENABLED" > "$LOGIN_PERSISTENCE_REPEATED"
+if [[ "$(grep -Fxc 'bPersistLogin=True' "$LOGIN_PERSISTENCE_ENABLED")" != 1 ]] \
+        || grep -Eq 'bPersistLogin[[:space:]]*=[[:space:]]*False' "$LOGIN_PERSISTENCE_ENABLED" \
+        || ! grep -Fqx 'bPersistLogin=UnrelatedValue' "$LOGIN_PERSISTENCE_ENABLED" \
+        || ! grep -Fqx 'ApplicationScale=1.25' "$LOGIN_PERSISTENCE_ENABLED" \
+        || ! grep -Fqx 'bEnableDebugLogging=False' "$LOGIN_PERSISTENCE_ENABLED" \
+        || ! cmp -s "$LOGIN_PERSISTENCE_ENABLED" "$LOGIN_PERSISTENCE_REPEATED"; then
+    print -u2 "Riot session persistence settings transform regressed."
+    exit 1
+fi
+if ! "$PROJECT_DIR/scripts/enable-tft-login-persistence.command" < /dev/null \
+        | grep -Fqx 'bPersistLogin=True'; then
+    print -u2 "Riot session persistence was not enabled in an empty Engine.ini."
+    exit 1
+fi
 
 readonly PERFORMANCE_MODE_FIXTURE="$LIFECYCLE_ROOT/GameUserSettings.ini"
 readonly PERFORMANCE_MODE_ENABLED="$LIFECYCLE_ROOT/GameUserSettings.enabled.ini"
@@ -2524,6 +2561,8 @@ xcrun swiftc \
     "$LAUNCHER_DIR/Sources/HostedGameUpdate.swift" \
     "$LAUNCHER_DIR/Sources/LauncherPresentation.swift" \
     "$LAUNCHER_DIR/Sources/LauncherTelemetryService.swift" \
+    "$LAUNCHER_DIR/Sources/PerformanceModels.swift" \
+    "$LAUNCHER_DIR/Sources/PerformanceCollector.swift" \
     "$LAUNCHER_DIR/Sources/LauncherPaths.swift" \
     "$LAUNCHER_DIR/Sources/SystemServices.swift" \
     "$LAUNCHER_DIR/Sources/EmulatorBrandingPatch.swift" \

@@ -41,7 +41,7 @@ struct LauncherTelemetryNoticeView: View {
             }
         }
         .padding(LauncherTheme.Spacing.xLarge)
-        .frame(width: 580, height: 390)
+        .frame(width: 580, height: 430)
         .background(LauncherTheme.ColorToken.surface)
         .preferredColorScheme(.dark)
     }
