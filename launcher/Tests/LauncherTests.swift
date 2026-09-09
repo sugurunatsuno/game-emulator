@@ -98,14 +98,46 @@ enum LauncherTests {
             "resolution profile titles"
         )
         try expect(
-            EffectsQuality.selection(saved: nil) == .high
-                && EffectsQuality.selection(saved: "unknown") == .high
-                && EffectsQuality.selection(saved: "performance") == .performance
+            EffectsQuality.allCases == [.high, .maximum]
+                && EffectsQuality.selection(saved: nil) == .maximum
+                && EffectsQuality.selection(saved: "unknown") == .maximum
+                && EffectsQuality.selection(saved: "performance") == .maximum
+                && EffectsQuality.selection(saved: "high") == .high
                 && EffectsQuality.selection(saved: "maximum") == .maximum
                 && EffectsQuality.maximum.profileFilename
                     == "Android_Codex.DeviceProfiles.performance-max.ini",
             "effects quality selection"
         )
+        for saved in [nil, "high", "performance", "maximum", "unknown"] as [String?] {
+            let suite = "LauncherTests.effects-quality.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            if let saved {
+                defaults.set(saved, forKey: "effectsQuality")
+            }
+            defaults.set("quality", forKey: "launchProfile")
+            defaults.set(125, forKey: "uiScalePercent")
+            try expect(
+                EffectsQuality.restore(defaults: defaults) == .maximum
+                    && defaults.string(forKey: "effectsQuality") == "maximum",
+                "first launch migrates \(saved ?? "fresh install") to Maximum FPS"
+            )
+            try expect(
+                defaults.string(forKey: "launchProfile") == "quality"
+                    && defaults.integer(forKey: "uiScalePercent") == 125,
+                "effects migration preserves unrelated settings"
+            )
+            for choice in EffectsQuality.allCases {
+                defaults.set(choice.id, forKey: "effectsQuality")
+                let relaunchedDefaults = UserDefaults(suiteName: suite)!
+                try expect(
+                    EffectsQuality.restore(defaults: relaunchedDefaults) == choice
+                        && EffectsQuality.restore(defaults: relaunchedDefaults) == choice
+                        && relaunchedDefaults.string(forKey: "effectsQuality") == choice.id,
+                    "subsequent launches preserve the player's \(choice.id) choice"
+                )
+            }
+        }
         try expect(manifest.profiles[0].displaySize == "1920x1080", "balanced resolution")
         try expect(manifest.profiles[0].displayResolution == "1920 × 1080", "display resolution formatting")
         try expect(manifest.profiles[1].displaySize == "2560x1440", "quality resolution")
@@ -188,7 +220,7 @@ enum LauncherTests {
         )
         let telemetrySettings = LauncherTelemetrySettings(
             profile: manifest.profiles[1],
-            effectsQuality: .performance,
+            effectsQuality: .maximum,
             uiScalePercent: 125,
             androidMemoryMB: 8_192,
             androidCPUCores: 6
@@ -614,7 +646,7 @@ enum LauncherTests {
                 && (diagnosticsEvent["consent_version"] as? NSNumber)?.intValue == 2
                 && (diagnosticsEvent["duration_seconds"] as? NSNumber)?.int64Value == 2_871
                 && settingsPayload["profile_id"] as? String == "quality"
-                && settingsPayload["effects_quality_id"] as? String == "performance"
+                && settingsPayload["effects_quality_id"] as? String == "maximum"
                 && settingsPayload["game_language"] == nil
                 && (settingsPayload["guest_memory_mb"] as? NSNumber)?.intValue == 8_192
                 && (settingsPayload["guest_cpu_cores"] as? NSNumber)?.intValue == 6
@@ -907,8 +939,8 @@ enum LauncherTests {
             "app bundle identifier"
         )
         try expect(infoPlist["CFBundleIconFile"] as? String == "Mactician.icns", "launcher icon name")
-        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.2.0", "launcher version")
-        try expect(infoPlist["CFBundleVersion"] as? String == "49", "launcher build")
+        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.2.2", "launcher version")
+        try expect(infoPlist["CFBundleVersion"] as? String == "51", "launcher build")
         try expect(
             infoPlist["SUFeedURL"] as? String == "https://sergeinaumov.dev/mactician/updates/appcast.xml",
             "Sparkle appcast URL"
@@ -1006,10 +1038,10 @@ enum LauncherTests {
             "emulator host icon name"
         )
         try expect(
-            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.2.0",
+            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.2.2",
             "emulator host version"
         )
-        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "49", "emulator host build")
+        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "51", "emulator host build")
         try expect(
             emulatorHostInfo["CFBundleIdentifier"] as? String
                 == "dev.sergeinaumov.mactician.game-host",
@@ -1473,7 +1505,7 @@ enum LauncherTests {
                 && buildScript.contains("Contents/Helpers/Mactician Game Host.app")
                 && buildScript.contains("-framework AppKit")
                 && buildScript.contains("Android_Codex.DeviceProfiles.effects-high.ini")
-                && buildScript.contains("Android_Codex.DeviceProfiles.effects-performance.ini")
+                && !buildScript.contains("Android_Codex.DeviceProfiles.effects-performance.ini")
                 && buildScript.contains("Android_Codex.DeviceProfiles.performance-max.ini"),
             "release artifact naming"
         )

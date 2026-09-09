@@ -165,8 +165,6 @@ copy_plain_file "$PROJECT_DIR/artifacts/tft-pbe-18.1-5212127-angle-opengl/Androi
     "$RUNTIME_TEMPLATE/artifacts/tft-18.1-angle-opengl/Android_Codex.DeviceProfiles.performance-max.ini"
 copy_plain_file "$PROJECT_DIR/artifacts/tft-pbe-18.1-5212127-angle-opengl/Android_Codex.DeviceProfiles.effects-high.ini" \
     "$RUNTIME_TEMPLATE/artifacts/tft-18.1-angle-opengl/Android_Codex.DeviceProfiles.effects-high.ini"
-copy_plain_file "$PROJECT_DIR/artifacts/tft-pbe-18.1-5212127-angle-opengl/Android_Codex.DeviceProfiles.effects-performance.ini" \
-    "$RUNTIME_TEMPLATE/artifacts/tft-18.1-angle-opengl/Android_Codex.DeviceProfiles.effects-performance.ini"
 chmod 755 \
     "$RUNTIME_TEMPLATE/run-tft-root-affinity.command" \
     "$RUNTIME_TEMPLATE/run-tft-angle-opengl.command" \

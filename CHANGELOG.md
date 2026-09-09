@@ -1,10 +1,30 @@
 # Changelog
 
-The current application metadata is version 1.2.0, build 49.
+The current application metadata is version 1.2.2, build 51.
 
 ## Unreleased
 
 Planned for 1.3.0: the validated Global Vulkan buffer-view cache.
+
+## 1.2.2 — 2026-09-09
+
+### Changed
+
+- Select Maximum FPS once on the first launch after updating, then preserve
+  the player's subsequent choice. New installations also start with Maximum FPS.
+- Remove the Performance detail preset; keep High and Maximum FPS.
+- Route the Donate button through the website to count donation-page visits.
+
+## 1.2.1 — 2026-09-09
+
+### Changed
+
+- Refresh the launcher with a larger title, dark ribbon artwork, a compact
+  Play / Settings card, and a dedicated support and feedback panel.
+- Apply the same visual style to installation, launch, running and error screens.
+- Move game edition and resolution controls into the existing Settings window.
+- Remove the header settings icon; open Settings from each state card or with ⌘,.
+- Keep long screens scrollable and button labels readable in English and Russian.
 
 ## 1.2.0 — 2026-09-08
 

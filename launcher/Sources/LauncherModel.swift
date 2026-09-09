@@ -101,9 +101,7 @@ final class LauncherModel: ObservableObject {
             )
             let saved = UserDefaults.standard.string(forKey: "launchProfile") ?? "balanced"
             selectedProfileID = manifest.profiles.contains(where: { $0.id == saved }) ? saved : "balanced"
-            selectedEffectsQualityID = EffectsQuality.selection(
-                saved: UserDefaults.standard.string(forKey: "effectsQuality")
-            ).id
+            selectedEffectsQualityID = EffectsQuality.restore().id
             selectedLanguageID = GameLanguage.language(
                 withID: UserDefaults.standard.string(forKey: "gameLanguage")
             ).id

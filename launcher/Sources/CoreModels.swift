@@ -9,7 +9,7 @@ enum MacticianIdentity {
     static let loggingSubsystem = bundleIdentifier
     static let websiteURL = URL(string: "https://sergeinaumov.dev/mactician")!
     static let feedbackURL = URL(string: "https://sergeinaumov.dev/mactician/feedback")!
-    static let donateURL = URL(string: "https://app.lava.top/mactician?tabId=donate")!
+    static let donateURL = URL(string: "https://sergeinaumov.dev/mactician/donate")!
     static let privacyPolicyURL = URL(string: "https://sergeinaumov.dev/mactician/privacy")!
     static let extendedDiagnosticsURL = URL(
         string: "https://sergeinaumov.dev/mactician/privacy#extended-diagnostics"
@@ -161,7 +161,6 @@ struct LaunchProfile: Codable, Equatable, Identifiable {
 
 enum EffectsQuality: String, CaseIterable, Identifiable {
     case high
-    case performance
     case maximum
 
     var id: String { rawValue }
@@ -170,8 +169,6 @@ enum EffectsQuality: String, CaseIterable, Identifiable {
         switch self {
         case .high:
             return LauncherL10n.text("effects_quality.high")
-        case .performance:
-            return LauncherL10n.text("effects_quality.performance")
         case .maximum:
             return LauncherL10n.text("effects_quality.maximum")
         }
@@ -181,8 +178,6 @@ enum EffectsQuality: String, CaseIterable, Identifiable {
         switch self {
         case .high:
             return LauncherL10n.text("effects_quality.high.detail")
-        case .performance:
-            return LauncherL10n.text("effects_quality.performance.detail")
         case .maximum:
             return LauncherL10n.text("effects_quality.maximum.detail")
         }
@@ -190,7 +185,7 @@ enum EffectsQuality: String, CaseIterable, Identifiable {
 
     var profileFilename: String {
         switch self {
-        case .high, .performance:
+        case .high:
             return "Android_Codex.DeviceProfiles.effects-\(rawValue).ini"
         case .maximum:
             return "Android_Codex.DeviceProfiles.performance-max.ini"
@@ -198,7 +193,16 @@ enum EffectsQuality: String, CaseIterable, Identifiable {
     }
 
     static func selection(saved: String?) -> EffectsQuality {
-        EffectsQuality(rawValue: saved ?? "") ?? .high
+        EffectsQuality(rawValue: saved ?? "") ?? .maximum
+    }
+
+    static func restore(defaults: UserDefaults = .standard) -> EffectsQuality {
+        let migrationKey = "effectsQualityMaximumFPSMigrationV1"
+        if !defaults.bool(forKey: migrationKey) {
+            defaults.set(EffectsQuality.maximum.id, forKey: "effectsQuality")
+            defaults.set(true, forKey: migrationKey)
+        }
+        return selection(saved: defaults.string(forKey: "effectsQuality"))
     }
 }
 
