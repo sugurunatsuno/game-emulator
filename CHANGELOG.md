@@ -1,10 +1,19 @@
 # Changelog
 
-The current application metadata is version 1.2.2, build 51.
+The current application metadata is version 1.2.3, build 52.
 
 ## Unreleased
 
 Planned for 1.3.0: the validated Global Vulkan buffer-view cache.
+
+## 1.2.3 — 2026-09-11
+
+- Explain performance-sample losses with bounded diagnostics for captures,
+  recognition, scene transitions, frame collection, and collector timings.
+- Record the requested game language and screenshot-size category to diagnose
+  coverage gaps. Screenshots and recognized text stay on the Mac.
+- Preserve the existing scene classifier, measurement cadence, and game runtime
+  while collecting a diagnostic baseline.
 
 ## 1.2.2 — 2026-09-09
 
