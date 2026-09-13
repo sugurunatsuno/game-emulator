@@ -79,6 +79,12 @@ or making claims about collection cost in matches.
 
 ## Phase 2: rank the causes
 
+The [first field review, September 14](performance-telemetry-review-2026-09-14.md)
+analyzes 704 attempts on 1.2.3. Language-dependent HUD recognition, phase/context
+coverage and collection cost are the priorities. Counter validation and a local
+semantic-gate probe are complete; owned regular-match/localized image fixtures
+remain necessary before implementing and validating classifier changes.
+
 Take the first field snapshot 48–72 hours after diagnostic clients start
 reporting. This is a review time, not a guarantee of enough data. Check adoption,
 absolute sample counts and affected attempts as well as window percentages.
