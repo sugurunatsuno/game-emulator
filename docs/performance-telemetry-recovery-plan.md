@@ -85,6 +85,11 @@ coverage and collection cost are the priorities. Counter validation and a local
 semantic-gate probe are complete; owned regular-match/localized image fixtures
 remain necessary before implementing and validating classifier changes.
 
+A subsequent [passive live-client probe](tft-live-context-probe-2026-09-14.md)
+found structured match lifecycle fields and internal phase enums in TFT.log.
+Evaluate these direct signals before expanding OCR rules. The observed phase
+events are GC-triggered and incomplete; exact numeric stage remains unverified.
+
 Take the first field snapshot 48–72 hours after diagnostic clients start
 reporting. This is a review time, not a guarantee of enough data. Check adoption,
 absolute sample counts and affected attempts as well as window percentages.
