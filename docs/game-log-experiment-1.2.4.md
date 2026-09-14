@@ -32,6 +32,15 @@ and [the live probe findings](tft-live-context-probe-2026-09-14.md).
   The conservative payload envelope is 25,107 bytes plus a 1 KiB reserve,
   below the existing 32 KiB limit.
 
+The signed/notarized 1.2.4 build 53 was then installed over 1.2.3 on the same
+Mac. TFT reached the lobby with the existing settings and game content. A real
+foreground measurement produced one accepted lobby histogram, two lobby OCR
+endpoints and one gameflow_lobby log observation. The integrated log read/parse
+was in the 100–500 ms timing bucket. The production API retained revision 12
+with these counters; the client pending queue was empty. Initial background
+checks were skipped while the game was on another desktop. This verifies the
+release collector and delivery path in a lobby, not combat accuracy or FPS impact.
+
 Screenshots and raw logs are not committed. The reusable local probe is:
 
 ```sh

@@ -92,6 +92,8 @@ log rotation or reconnection. A successful read can contain no known events.
 | `phase_age` | Same age buckets; one per observed read |
 | `contexts_near_event` | Existing context outcome for an accepted frame window when the latest departure is at most ten seconds old at log read; bounded by recent reads and corresponding context counts |
 
+Ages use the integer guest clock at read start; bucket boundaries have roughly
+one second of clock rounding plus read latency, not screenshot-time precision.
 Age buckets do not overlap. `none` totals must match the corresponding value
 map. Every map is bounded, cannot decrease and rejects unknown keys. Background
 checks have no log observation. Probe-enabled attempts have a separate report
