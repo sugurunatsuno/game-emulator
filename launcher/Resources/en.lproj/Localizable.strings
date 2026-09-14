@@ -58,7 +58,7 @@
 "game_update.current.message" = "No update is available. Installed TFT version %@ already matches the hosted version.";
 
 "telemetry.notice.title" = "Usage statistics and diagnostics";
-"telemetry.notice.body" = "Mactician collects activity, session duration and performance metrics for everyone: Mac configuration, launcher settings, game/runtime versions, launch outcomes, frame times, memory and thermal state. Game screenshots are classified locally in memory; images and recognized text are never saved or sent. These metrics remain enabled whichever option you choose below. You can additionally share detailed completed-session diagnostic summaries and disable those later in Settings.";
+"telemetry.notice.body" = "Mactician collects activity, session duration and performance metrics for everyone: Mac configuration, launcher settings, game/runtime versions, launch outcomes, frame times, memory and thermal state. Game screenshots are classified locally in memory; images and recognized text are never saved or sent. Predefined game-log signals and age buckets are also collected; raw logs are never saved or sent. These metrics remain enabled whichever option you choose below. You can additionally share detailed completed-session diagnostic summaries and disable those later in Settings.";
 "telemetry.extended.toggle" = "Share additional completed-session diagnostic summaries.";
 "telemetry.extended.data_link" = "Data sent";
 "telemetry.privacy_policy" = "Privacy Policy";

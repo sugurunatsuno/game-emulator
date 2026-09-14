@@ -1,10 +1,18 @@
 # Changelog
 
-The current application metadata is version 1.2.3, build 52.
+The current application metadata is version 1.2.4, build 53.
 
 ## Unreleased
 
 Planned for 1.3.0: the validated Global Vulkan buffer-view cache.
+
+## 1.2.4 — 2026-09-14
+
+- Test a passive game-log source alongside screenshot performance diagnostics.
+  Record only predefined event categories, freshness and read-cost counters.
+- Handle unavailable, replaced and stale game logs without changing frame labels.
+- Keep unknown samples excluded from gameplay eligibility while evaluating the
+  incomplete lifecycle and GC-departure signals.
 
 ## 1.2.3 — 2026-09-11
 

@@ -939,8 +939,8 @@ enum LauncherTests {
             "app bundle identifier"
         )
         try expect(infoPlist["CFBundleIconFile"] as? String == "Mactician.icns", "launcher icon name")
-        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.2.3", "launcher version")
-        try expect(infoPlist["CFBundleVersion"] as? String == "52", "launcher build")
+        try expect(infoPlist["CFBundleShortVersionString"] as? String == "1.2.4", "launcher version")
+        try expect(infoPlist["CFBundleVersion"] as? String == "53", "launcher build")
         try expect(
             infoPlist["SUFeedURL"] as? String == "https://sergeinaumov.dev/mactician/updates/appcast.xml",
             "Sparkle appcast URL"
@@ -1038,10 +1038,10 @@ enum LauncherTests {
             "emulator host icon name"
         )
         try expect(
-            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.2.3",
+            emulatorHostInfo["CFBundleShortVersionString"] as? String == "1.2.4",
             "emulator host version"
         )
-        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "52", "emulator host build")
+        try expect(emulatorHostInfo["CFBundleVersion"] as? String == "53", "emulator host build")
         try expect(
             emulatorHostInfo["CFBundleIdentifier"] as? String
                 == "dev.sergeinaumov.mactician.game-host",
@@ -2329,6 +2329,12 @@ enum LauncherTests {
         let diagnosticSnapshot = try JSONDecoder().decode(PerformanceSnapshot.self, from: JSONSerialization.data(withJSONObject: diagnosticJSON))
         try expect(try JSONSerialization.jsonObject(with: JSONEncoder().encode(diagnosticSnapshot)) as! NSDictionary == diagnosticJSON as NSDictionary,
             "diagnostic wire fixture agrees with Swift")
+        let logFixtureURL = fixtureURL.deletingLastPathComponent().appendingPathComponent("game-session-performance-game-log-v2.json")
+        let logFixture = try JSONSerialization.jsonObject(with: Data(contentsOf: logFixtureURL)) as! [String: Any]
+        let logJSON = logFixture["performance"] as! [String: Any]
+        let logSnapshot = try JSONDecoder().decode(PerformanceSnapshot.self, from: JSONSerialization.data(withJSONObject: logJSON))
+        try expect(try JSONSerialization.jsonObject(with: JSONEncoder().encode(logSnapshot)) as! NSDictionary == logJSON as NSDictionary,
+            "game log wire fixture agrees with Swift")
         try testPerformanceDiagnostics(runtime: snapshot.runtime)
         let histogram = snapshot.segments[0].histogram
         let row = zip(SurfaceFlingerTimeStats.buckets, histogram).map { "\($0)ms=\($1)" }.joined(separator: " ")
@@ -2437,6 +2443,7 @@ enum LauncherTests {
     }
 
     private static func testPerformanceDiagnostics(runtime: PerformanceRuntime) throws {
+        try testGameLogDiagnostics()
         func endpoint(_ state: String = "battle", stage: String? = "4-2", phase: String? = "combat", hud: Bool = true) throws -> PerformanceEndpoint {
             let json: [String: Any] = ["diagnostics_version": 1, "state": state, "stage": stage ?? NSNull(),
                 "observed_stage": stage ?? NSNull(), "stage_read": stage != nil, "phase": phase ?? NSNull(),
@@ -2487,6 +2494,46 @@ enum LauncherTests {
         try expect(d.measurements["invalid_duration"] == 1 && d.measurements["invalid_histogram"] == 1 && d.measurements["timestats_failed"] == 1,
             "measurement failures keep distinct causes")
         try expect(d.timings["classifier"]?[0] == 1 && d.timings["classifier"]?[1] == 1, "timing upper bounds match the API")
+        try expect(d.version == 2 && d.gameLog?.reads["read_failed"] == p.windowsAttempted,
+            "one shadow read result per foreground attempt, background excluded")
+    }
+
+    private static func testGameLogDiagnostics() throws {
+        // Sanitized reconstructions of the observed TFT log format; no player data.
+        let now = 1789385490.0 // 2026-09-14 11:31:30 UTC
+        let proc = "42 (TFT game) S " + Array(repeating: "0", count: 18).joined(separator: " ") + " 10000"
+        func snapshot(_ log: String, finalFile: String = "10 1000", finalProc: String? = nil) -> Data {
+            Data("snapshot\n\(Int(now))\n1000.0 0\n100\n\(proc)\n10 1000\npartial first line\n\(log)\nMACTICIAN_LOG_END\n\(finalFile)\n\(finalProc ?? proc)\n".utf8)
+        }
+        let gc = "TFT: TFTRuntimePerformanceSubsystem: Scheduled phase garbage collection / Phase[ETFTPhaseType::CombatDeparture]"
+        let recent = "[2026.09.14-11.31.25:000][1]\(gc)\n"
+        let lifecycle = "[2026.09.14-11.26.05:997][2]RMS {\"gameState\":\"IN_PROGRESS\",\"token\":\"private-test-sentinel\"}\n"
+        let result = GameLogObservation.decode(snapshot(lifecycle + recent))
+        try expect(result.outcome == "observed" && result.phaseEvent == "combat_departure" && result.phaseAge == "within_10s",
+            "real departure meaning and freshness are preserved")
+        try expect(result.lifecycle == "state_in_progress" && result.lifecycleAge == "older", "old lifecycle has an explicit age")
+        let encoded = String(decoding: try JSONEncoder().encode(result), as: UTF8.self)
+        try expect(!encoded.contains("private-test-sentinel") && !encoded.contains("2026") && !encoded.contains("token"), "no raw log or identifiers in output")
+        try expect(GameLogObservation.decode(snapshot(recent, finalFile: "11 1000")).outcome == "log_changed", "rotation rejected")
+        try expect(GameLogObservation.decode(snapshot(recent, finalFile: "10 900")).outcome == "log_changed", "truncation rejected")
+        try expect(GameLogObservation.decode(snapshot(recent, finalProc: proc.replacingOccurrences(of: "10000", with: "10100"))).outcome == "log_changed", "process restart rejected even with reused PID")
+        for stamp in ["2026.09.14-11.15.00:000", "2026.09.14-11.32.00:000"] {
+            try expect(GameLogObservation.decode(snapshot("[\(stamp)][1]\(gc)\n")).phaseEvent == "none", "previous process and future events ignored")
+        }
+        try expect(GameLogObservation.decode(snapshot(recent.trimmingCharacters(in: .newlines))).phaseEvent == "none", "partial trailing record ignored")
+        try expect(GameLogObservation.decode(snapshot("unrelated log\n")).phaseEvent == "none", "no cached phase carried across reads")
+        try expect(GameLogObservation.decode(nil).outcome == "read_failed", "read failure is bounded")
+        try expect(GameLogObservation.decode(Data("game_not_running\n".utf8)).outcome == "game_not_running", "game closure is observable")
+        try expect(GameLogObservation.decode(Data(repeating: 65, count: GameLogObservation.maximumResponseBytes + 1)).outcome == "invalid_snapshot", "oversized logs rejected")
+        try expect(GameLogObservation.command(package: "x; touch /tmp/test") == nil, "shell package must be allowlisted")
+        var counters = GameLogDiagnostics()
+        counters.record(result, context: "both_unknown")
+        counters.record(GameLogObservation(outcome: "log_unavailable"), context: "gameplay")
+        try expect(counters.contextsNearEvent == ["both_unknown": 1] && counters.phaseEvents == ["combat_departure": 1], "shadow observations do not promote unknown scenes")
+        var old = try JSONSerialization.jsonObject(with: JSONEncoder().encode(PerformanceDiagnostics(language: "en-US"))) as! [String: Any]
+        old["version"] = 1; old["implementation"] = "screen-bracket-diagnostics-v1"; old.removeValue(forKey: "game_log")
+        let recovered = try JSONDecoder().decode(PerformanceDiagnostics.self, from: JSONSerialization.data(withJSONObject: old))
+        try expect(recovered.version == 1 && recovered.gameLog == nil, "old pending checkpoints keep their diagnostic identity")
     }
 
     private static func expect(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {

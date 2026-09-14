@@ -2,8 +2,8 @@ import Foundation
 
 // Cumulative, bounded metadata only. These counters do not change scene labels.
 struct PerformanceDiagnostics: Codable, Equatable {
-    var version = 1
-    var implementation = "screen-bracket-diagnostics-v1"
+    var version = 2
+    var implementation = "screen-bracket-game-log-v2"
     var language: String
     var measurements: [String: Int64] = [:]
     var endpoints: [String: Int64] = [:]
@@ -13,10 +13,12 @@ struct PerformanceDiagnostics: Codable, Equatable {
     var contexts: [String: Int64] = [:]
     var timings: [String: [Int64]] = [:]
     var backoffWindows: Int64 = 0
+    var gameLog: GameLogDiagnostics? = GameLogDiagnostics()
 
     enum CodingKeys: String, CodingKey {
         case version, implementation, language, measurements, endpoints, states, signals, dimensions, contexts, timings
         case backoffWindows = "backoff_windows"
+        case gameLog = "game_log"
     }
 
     // Noncumulative upper bounds in milliseconds; the final bucket is overflow.
@@ -44,6 +46,7 @@ struct PerformanceDiagnostics: Codable, Equatable {
             for i in counts.indices { timings[key, default: [Int64](repeating: 0, count: Self.timingBounds.count)][i] += counts[i] }
         }
         if sample.backoff { backoffWindows += 1 }
+        if !sample.background { gameLog?.record(sample.gameLog, context: context) }
     }
 }
 

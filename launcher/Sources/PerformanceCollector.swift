@@ -105,6 +105,15 @@ final class PerformanceCollector {
             let disableBegan = ProcessInfo.processInfo.systemUptime
             disableTimeStats()
             result.observe("timestats", since: disableBegan)
+            // Read once after the entire frame/OCR bracket. The bounded shadow
+            // probe cannot add a gap between the before screenshot and frames.
+            if !isStopped, let command = GameLogObservation.command(package: package) {
+                let logBegan = ProcessInfo.processInfo.systemUptime
+                let data = run(adb, ["-P", "5038", "-s", "emulator-5582", "shell", command],
+                    maximumBytes: GameLogObservation.maximumResponseBytes, timeoutSeconds: 2)
+                result.gameLog = GameLogObservation.decode(data)
+                result.observe("game_log", since: logBegan)
+            }
         }
         let totalMS = Int64((ProcessInfo.processInfo.systemUptime - began) * 1000)
         result.collectorMS = max(0, totalMS - (result.durationMS > 0 ? 2000 : 0))
@@ -175,7 +184,7 @@ final class PerformanceCollector {
         run(adb, ["-P", "5038", "-s", "emulator-5582"] + arguments, maximumBytes: maximumBytes, allowStopped: allowStopped)
     }
 
-    private func run(_ executable: URL, _ arguments: [String], input: Data? = nil, maximumBytes: Int, allowStopped: Bool = false) -> Data? {
+    private func run(_ executable: URL, _ arguments: [String], input: Data? = nil, maximumBytes: Int, allowStopped: Bool = false, timeoutSeconds: Double = 10) -> Data? {
         lastRunFailure = "helper_failed"
         let child = Process(), output = Pipe(), inputPipe = Pipe()
         child.executableURL = executable; child.arguments = arguments
@@ -189,7 +198,7 @@ final class PerformanceCollector {
         do { try child.run(); process = child; lock.unlock() } catch { lock.unlock(); return nil }
         let deadline = CommandDeadline()
         let timeout = DispatchWorkItem { deadline.terminate(child) }
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 10, execute: timeout)
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeoutSeconds, execute: timeout)
         defer {
             timeout.cancel()
             if child.isRunning { kill(child.processIdentifier, SIGKILL) }

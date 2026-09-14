@@ -269,3 +269,10 @@ The release order is server compatibility, schema-v2 verification, public
 privacy-policy publication, then the launcher update. No legacy event contract
 is retained because the previous API and its data belonged only to the local
 pre-release laboratory.
+
+Diagnostics v2 additionally read a bounded tail of the game log locally in
+memory. Only allowlisted lifecycle/GC-departure categories, event-age buckets,
+read outcomes and timing counts are sent. Raw log text, identifiers, tokens and
+event timestamps are never saved or uploaded. These shadow observations do not
+change frame labels or assert the current stage/phase. They are standard
+performance collection, with the same queue, retention and cohort suppression.

@@ -142,6 +142,7 @@ struct PerformanceSample {
     var contextReason: String?
     var timings: [String: [Int64]] = [:]
     var backoff = false
+    var gameLog = GameLogObservation(outcome: "read_failed")
 
     mutating func observe(_ key: String, since began: TimeInterval) {
         PerformanceDiagnostics.observe(key, milliseconds: Int64((ProcessInfo.processInfo.systemUptime - began) * 1000), in: &timings)
