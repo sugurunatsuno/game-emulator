@@ -7,7 +7,7 @@
         android:allowBackup="false"
         android:debuggable="true"
         android:hasCode="true"
-        android:label="Mactician GLES Probe"
+        android:label="Hako GLES Probe"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
         <activity
             android:name=".StressActivity"
