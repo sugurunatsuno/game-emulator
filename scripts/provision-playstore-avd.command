@@ -46,7 +46,7 @@ trap 'rm -rf "$STAGING_DIR"' EXIT
 
 cat > "$STAGING_DIR/config.ini" <<EOF
 AvdId=$AVD_NAME
-avd.ini.displayname=Mactician Play Store
+avd.ini.displayname=Hako Play Store
 abi.type=arm64-v8a
 hw.cpu.arch=arm64
 hw.cpu.ncore=${PLAYSTORE_CPU_CORES:-6}
