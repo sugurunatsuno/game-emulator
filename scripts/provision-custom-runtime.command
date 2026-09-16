@@ -9,7 +9,7 @@ source "$PROJECT_DIR/scripts/android-environment.sh"
 
 readonly SDK_ROOT="${CUSTOM_ANDROID_SDK_ROOT:-$(resolve_android_sdk_root)}"
 readonly AVD_HOME="${CUSTOM_AVD_HOME:-${ANDROID_AVD_HOME:-$HOME/.android/avd}}"
-readonly AVD_NAME="${CUSTOM_AVD_NAME:-MacticianCustom}"
+readonly AVD_NAME="${CUSTOM_AVD_NAME:-HakoCustom}"
 readonly API_LEVEL="${CUSTOM_API_LEVEL:-35}"
 readonly IMAGE_FLAVOR="${CUSTOM_IMAGE_FLAVOR:-google_apis}"
 readonly ABI="${CUSTOM_ABI:-arm64-v8a}"
@@ -23,6 +23,7 @@ readonly WIDTH="${CUSTOM_WIDTH:-900}"
 readonly HEIGHT="${CUSTOM_HEIGHT:-1600}"
 readonly DENSITY="${CUSTOM_DENSITY:-240}"
 readonly GUEST_AGENT_APK="${CUSTOM_GUEST_AGENT_APK:-}"
+readonly LOG_FILE="${CUSTOM_RUNTIME_LOG:-/tmp/hako-custom-runtime.log}"
 
 find_sdk_tool() {
     local name="$1"
@@ -47,7 +48,7 @@ readonly EMULATOR="$SDK_ROOT/emulator/emulator"
 
 [[ -x "$ADB" ]] || { print -u2 "adbが見つかりません: $ADB"; exit 2; }
 [[ -x "$EMULATOR" ]] || { print -u2 "emulatorが見つかりません: $EMULATOR"; exit 2; }
-[[ "$EMULATOR_PORT" == <-> ]] || { print -u2 "CUSTOM_EMULATOR_PORTは数値で指定してください。"; exit 2; }
+[[ "$EMULATOR_PORT" == <0-9>## ]] || { print -u2 "CUSTOM_EMULATOR_PORTは数値で指定してください。"; exit 2; }
 (( EMULATOR_PORT >= 5554 && EMULATOR_PORT <= 5682 && EMULATOR_PORT % 2 == 0 )) || {
     print -u2 "CUSTOM_EMULATOR_PORTは5554から5682までの偶数で指定してください。"
     exit 2
@@ -116,7 +117,7 @@ ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR" "@$AVD_NAME" \
     -no-boot-anim \
     -no-snapshot \
     -no-audio \
-    >/tmp/mactician-custom-runtime.log 2>&1 &
+    >"$LOG_FILE" 2>&1 &
 readonly EMULATOR_PID=$!
 
 cleanup() {
@@ -137,26 +138,22 @@ for _ in {1..180}; do
 done
 
 if [[ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]]; then
-    print -u2 "Androidの起動が完了しませんでした。ログ: /tmp/mactician-custom-runtime.log"
+    print -u2 "Androidの起動が完了しませんでした。ログ: $LOG_FILE"
     exit 3
 fi
 
-# UIアニメーションを切り、エミュレータの余計な描画待ちを減らす。
 "$ADB" -s "$SERIAL" shell settings put global window_animation_scale 0
 "$ADB" -s "$SERIAL" shell settings put global transition_animation_scale 0
 "$ADB" -s "$SERIAL" shell settings put global animator_duration_scale 0
 
-# 個人用ゲーム端末として扱いやすい既定値にする。
 "$ADB" -s "$SERIAL" shell settings put system screen_off_timeout 2147483647
 "$ADB" -s "$SERIAL" shell settings put global stay_on_while_plugged_in 3
 "$ADB" -s "$SERIAL" shell settings put system accelerometer_rotation 0
 "$ADB" -s "$SERIAL" shell wm size "${WIDTH}x${HEIGHT}"
 "$ADB" -s "$SERIAL" shell wm density "$DENSITY"
 
-# logcatリングを小さくする。失敗しても実行環境の生成自体は続ける。
 "$ADB" -s "$SERIAL" logcat -G "${CUSTOM_LOGCAT_SIZE:-2M}" >/dev/null 2>&1 || true
 
-# 明示指定されたパッケージだけを無効化する。既定では何も消さない。
 if [[ -n "${CUSTOM_DISABLE_PACKAGES:-}" ]]; then
     for package_name in ${(z)CUSTOM_DISABLE_PACKAGES}; do
         print "無効化: $package_name"
@@ -164,7 +161,6 @@ if [[ -n "${CUSTOM_DISABLE_PACKAGES:-}" ]]; then
     done
 fi
 
-# Guest Agentは初版ではuserdataへ導入する。system priv-app化はAOSPビルド段階で行う。
 if [[ -n "$GUEST_AGENT_APK" ]]; then
     [[ -f "$GUEST_AGENT_APK" ]] || { print -u2 "Guest Agent APKが見つかりません: $GUEST_AGENT_APK"; exit 2; }
     print "Guest Agentを導入します: $GUEST_AGENT_APK"
