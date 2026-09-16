@@ -14,7 +14,6 @@ readonly API_LEVEL="${CUSTOM_API_LEVEL:-35}"
 readonly IMAGE_FLAVOR="${CUSTOM_IMAGE_FLAVOR:-google_apis}"
 readonly ABI="${CUSTOM_ABI:-arm64-v8a}"
 readonly IMAGE_PACKAGE="system-images;android-${API_LEVEL};${IMAGE_FLAVOR};${ABI}"
-readonly DEVICE_PROFILE="${CUSTOM_DEVICE_PROFILE:-pixel_8}"
 readonly EMULATOR_PORT="${CUSTOM_EMULATOR_PORT:-5580}"
 readonly SERIAL="emulator-${EMULATOR_PORT}"
 readonly CPU_CORES="${CUSTOM_CPU_CORES:-6}"
@@ -48,7 +47,7 @@ readonly EMULATOR="$SDK_ROOT/emulator/emulator"
 
 [[ -x "$ADB" ]] || { print -u2 "adbが見つかりません: $ADB"; exit 2; }
 [[ -x "$EMULATOR" ]] || { print -u2 "emulatorが見つかりません: $EMULATOR"; exit 2; }
-[[ "$EMULATOR_PORT" == <0-9>## ]] || { print -u2 "CUSTOM_EMULATOR_PORTは数値で指定してください。"; exit 2; }
+[[ "$EMULATOR_PORT" == <-> ]] || { print -u2 "CUSTOM_EMULATOR_PORTは数値で指定してください。"; exit 2; }
 (( EMULATOR_PORT >= 5554 && EMULATOR_PORT <= 5682 && EMULATOR_PORT % 2 == 0 )) || {
     print -u2 "CUSTOM_EMULATOR_PORTは5554から5682までの偶数で指定してください。"
     exit 2
@@ -76,8 +75,7 @@ if [[ ! -d "$AVD_DIR" ]]; then
     print "no" | ANDROID_AVD_HOME="$AVD_HOME" "$AVDMANAGER" create avd \
         --force \
         --name "$AVD_NAME" \
-        --package "$IMAGE_PACKAGE" \
-        --device "$DEVICE_PROFILE"
+        --package "$IMAGE_PACKAGE"
 fi
 
 readonly CONFIG="$AVD_DIR/config.ini"
