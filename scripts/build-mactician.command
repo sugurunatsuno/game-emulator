@@ -16,6 +16,8 @@ xcrun swiftc -O -parse-as-library -target arm64-apple-macosx12.0 \
     -o "$MACOS/Mactician"
 cp -X "$LAUNCHER_DIR/Info.plist" "$CONTENTS/Info.plist"
 cp -X "$LAUNCHER_DIR/Resources/Mactician.icns" "$RESOURCES/Mactician.icns"
+cp -X "$PROJECT_DIR/scripts/install-android-runtime.command" "$RESOURCES/install-android-runtime.command"
+chmod 755 "$RESOURCES/install-android-runtime.command"
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --deep --strict "$APP"
 print "Built: $APP"

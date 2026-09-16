@@ -30,6 +30,23 @@ Google Play Storeを利用するゲームでは、Android Studioから対応す�
 
 生成物は`dist/Mactician.app`です。ゲームAPKや認証情報はビルドへ含めません。
 
+## Android実行環境の導入
+
+Platform ToolsとAndroid Emulatorがない場合は、Google公式配布物をダウンロードします。
+
+```zsh
+./scripts/install-android-runtime.command
+```
+
+保存先を変更する場合:
+
+```zsh
+ANDROID_RUNTIME_ROOT="$HOME/Library/Application Support/Mactician/sdk" \
+  ./scripts/install-android-runtime.command
+```
+
+AVDはAndroid Studioで作成してください。Google Playを使うゲームでは、Play Store system imageを選択します。既存のSDKが`/Volumes/SSD-4TB/MacticianData/sdk`など標準外の場所にある場合も、ランチャーが自動検出します。
+
 ## 起動
 
 1. `dist/Mactician.app`を起動します。
