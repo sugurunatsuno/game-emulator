@@ -13,9 +13,10 @@
 確認コマンド:
 
 ```zsh
-zsh -n scripts/build-mactician.command
+zsh -n scripts/build-hako.command
+zsh -n scripts/provision-custom-runtime.command
 zsh -n scripts/provision-playstore-avd.command
-./scripts/build-mactician.command
+./scripts/build-hako.command
 ```
 
 ゲームAPK、認証情報、AVDデータ、ログ、秘密情報はコミットしないでください。
