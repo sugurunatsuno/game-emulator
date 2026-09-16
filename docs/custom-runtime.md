@@ -1,6 +1,6 @@
 # カスタムAndroid実行環境
 
-Macticianでは、配布済みROMや生成済みuserdataをリポジトリへ含めず、利用者自身のMac上でAndroid実行環境を生成します。
+Hakoでは、配布済みROMや生成済みuserdataをリポジトリへ含めず、利用者自身のMac上でAndroid実行環境を生成します。
 
 この構成はMuMu Player Proの調査で確認した、VMテンプレートとゲスト側専用機能を事前に用意する設計を参考にしています。ただしMuMuのファイルやコードは使用しません。
 
@@ -8,7 +8,7 @@ Macticianでは、配布済みROMや生成済みuserdataをリポジトリへ含
 
 カスタム実行環境とPlay Store用AVDは分離します。
 
-- `MacticianCustom`: root可能なGoogle APIs系ARM64イメージを基に、ゲーム向け設定と任意のGuest Agentを事前導入する
+- `HakoCustom`: root可能なGoogle APIs系ARM64イメージを基に、ゲーム向け設定と任意のGuest Agentを事前導入する
 - `PlayStore`: Google Play Store公式イメージをそのまま利用する
 
 Play Storeイメージのsystem領域は改変しません。
@@ -33,7 +33,7 @@ zsh scripts/provision-custom-runtime.command
 - 900x1600
 - 240 DPI
 - 16 GiB userdata
-- AVD名 `MacticianCustom`
+- AVD名 `HakoCustom`
 
 生成物は通常のAVDディレクトリへ保存され、Gitリポジトリには入りません。
 
@@ -62,7 +62,7 @@ CUSTOM_DISABLE_PACKAGES="com.example.one com.example.two" \
 Guest Agent APKがある場合は初期userdataへ事前導入できます。
 
 ```zsh
-CUSTOM_GUEST_AGENT_APK="$HOME/path/MacticianGuestAgent.apk" \
+CUSTOM_GUEST_AGENT_APK="$HOME/path/HakoGuestAgent.apk" \
   zsh scripts/provision-custom-runtime.command
 ```
 
@@ -74,7 +74,7 @@ MuMuで確認したようなsystem UIDのpriv-app、framework bridge、native da
 
 ```mermaid
 flowchart TD
-    A[Mactician.app] --> B[Host Controller]
+    A[Hako.app] --> B[Host Controller]
     B --> C[Android Emulator / QEMU]
     C <--> D[Native Guest Bridge]
     D <--> E[System Guest Agent]
@@ -88,7 +88,7 @@ Host ControllerとGuest Agentの通信はADBとは分離します。ADBはデバ
 環境変数で生成内容を変更できます。
 
 ```zsh
-CUSTOM_AVD_NAME=MacticianGame \
+CUSTOM_AVD_NAME=HakoGame \
 CUSTOM_CPU_CORES=4 \
 CUSTOM_MEMORY_MB=4096 \
 CUSTOM_WIDTH=1280 \
@@ -105,7 +105,7 @@ zsh scripts/provision-custom-runtime.command
 | `CUSTOM_API_LEVEL` | `35` |
 | `CUSTOM_IMAGE_FLAVOR` | `google_apis` |
 | `CUSTOM_ABI` | `arm64-v8a` |
-| `CUSTOM_AVD_NAME` | `MacticianCustom` |
+| `CUSTOM_AVD_NAME` | `HakoCustom` |
 | `CUSTOM_CPU_CORES` | `6` |
 | `CUSTOM_MEMORY_MB` | `6144` |
 | `CUSTOM_WIDTH` | `900` |
@@ -114,6 +114,7 @@ zsh scripts/provision-custom-runtime.command
 | `CUSTOM_DATA_SIZE` | `16384M` |
 | `CUSTOM_LOGCAT_SIZE` | `2M` |
 | `CUSTOM_EMULATOR_PORT` | `5580` |
+| `CUSTOM_RUNTIME_LOG` | `/tmp/hako-custom-runtime.log` |
 
 ## 軽量化の進め方
 
