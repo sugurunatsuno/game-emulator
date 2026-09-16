@@ -59,6 +59,7 @@ final class EmulatorModel: ObservableObject {
     private var emulator: Process?
     private var avdHome: String
     private let serial = "emulator-5554"
+    private let adbPort = "5037"
 
     init(defaults: UserDefaults = .standard) {
         let savedSDK = defaults.string(forKey: "sdkRoot")
@@ -66,8 +67,11 @@ final class EmulatorModel: ObservableObject {
             ?? Self.defaultSDKRoot()
         sdkRoot = detectedSDK
         avdHome = Self.defaultAVDHome(sdkRoot: detectedSDK)
-        avdName = defaults.string(forKey: "avdName")
-            ?? Self.firstAVDName(sdkRoot: detectedSDK, avdHome: avdHome)
+        let availableAVDs = Self.availableAVDNames(sdkRoot: detectedSDK, avdHome: avdHome)
+        let savedAVD = defaults.string(forKey: "avdName")
+        avdName = savedAVD.flatMap { availableAVDs.contains($0) ? $0 : nil }
+            ?? availableAVDs.first
+            ?? savedAVD
             ?? "PlayStore"
         packageName = defaults.string(forKey: "packageName") ?? ""
     }
@@ -99,7 +103,7 @@ final class EmulatorModel: ObservableObject {
             ?? candidates[1]
     }
 
-    private static func firstAVDName(sdkRoot: String, avdHome: String) -> String? {
+    private static func availableAVDNames(sdkRoot: String, avdHome: String) -> [String] {
         let emulatorURL = URL(fileURLWithPath: sdkRoot).appendingPathComponent("emulator/emulator")
         let process = Process()
         let pipe = Pipe()
@@ -112,9 +116,9 @@ final class EmulatorModel: ObservableObject {
             try process.run()
             process.waitUntilExit()
             return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .split(whereSeparator: \.isNewline).first.map(String.init)
+                .split(whereSeparator: \.isNewline).map(String.init) ?? []
         } catch {
-            return nil
+            return []
         }
     }
 
@@ -174,10 +178,10 @@ final class EmulatorModel: ObservableObject {
             for _ in 0..<120 {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard isRunning else { return }
-                if run(adbURL, arguments: ["-s", serial, "shell", "getprop", "sys.boot_completed"]) == "1" {
+                if run(adbURL, arguments: adbArguments(["-s", serial, "shell", "getprop", "sys.boot_completed"])) == "1" {
                     if packageName.isEmpty {
                         status = "AVDの起動が完了しました"
-                    } else if run(adbURL, arguments: ["-s", serial, "shell", "monkey", "-p", packageName, "1"]) != nil {
+                    } else if run(adbURL, arguments: adbArguments(["-s", serial, "shell", "monkey", "-p", packageName, "1"])) != nil {
                         status = "ゲームを起動しました: \(packageName)"
                     } else {
                         status = "AVDは起動しましたが、ゲームを起動できませんでした"
@@ -187,6 +191,10 @@ final class EmulatorModel: ObservableObject {
             }
             status = "AVDの起動がタイムアウトしました"
         }
+    }
+
+    private func adbArguments(_ arguments: [String]) -> [String] {
+        ["-P", adbPort] + arguments
     }
 
     private func run(_ executable: URL, arguments: [String]) -> String? {
