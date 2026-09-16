@@ -5,13 +5,13 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>ja</string>
     <key>CFBundleDisplayName</key>
-    <string>Mactician</string>
+    <string>Hako</string>
     <key>CFBundleExecutable</key>
-    <string>Mactician</string>
+    <string>Hako</string>
     <key>CFBundleIconFile</key>
-    <string>Mactician.icns</string>
+    <string>Hako.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.sergeinaumov.mactician</string>
+    <string>io.github.sugurunatsuno.hako</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleLocalizations</key>
@@ -19,7 +19,7 @@
         <string>ja</string>
     </array>
     <key>CFBundleName</key>
-    <string>Mactician</string>
+    <string>Hako</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -38,6 +38,6 @@
         <true/>
     </dict>
     <key>NSHumanReadableCopyright</key>
-    <string>Mactician is free and open source.</string>
+    <string>Hako is free and open source.</string>
 </dict>
 </plist>
