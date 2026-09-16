@@ -1,6 +1,6 @@
-# Android ゲームエミュレータ
+# Hako
 
-Apple Silicon Macから、ローカルのAndroid SDKとAVDを使ってゲームを起動する最小ランチャーです。
+Apple Silicon MacでAndroidゲーム用のローカルVMを起動するランチャーです。
 
 特定のゲーム、販売元、APK、ログ形式、描画エンジンには依存しません。Google Play Storeイメージを含む、ユーザーが用意した任意のAVDを対象にします。
 
@@ -26,10 +26,12 @@ Google Play Storeを利用するゲームでは、Android Studioから対応す�
 ## ビルド
 
 ```zsh
-./scripts/build-mactician.command
+./scripts/build-hako.command
 ```
 
-生成物は`dist/Mactician.app`です。ゲームAPKや認証情報はビルドへ含めません。
+生成物は`dist/Hako.app`です。ゲームAPKや認証情報はビルドへ含めません。
+
+アプリアイコンは`branding/hako-app-icon.svg`からビルド時に`Hako.icns`へ変換します。
 
 ## Android実行環境の導入
 
@@ -42,11 +44,11 @@ Platform ToolsとAndroid Emulatorがない場合は、Google公式配布物を�
 保存先を変更する場合:
 
 ```zsh
-ANDROID_RUNTIME_ROOT="$HOME/Library/Application Support/Mactician/sdk" \
+ANDROID_RUNTIME_ROOT="$HOME/Library/Application Support/Hako/sdk" \
   ./scripts/install-android-runtime.command
 ```
 
-AVDはAndroid Studioで作成してください。Google Playを使うゲームでは、Play Store system imageを選択します。既存のSDKが`/Volumes/SSD-4TB/MacticianData/sdk`など標準外の場所にある場合も、ランチャーが自動検出します。
+AVDはAndroid Studioで作成してください。Google Playを使うゲームでは、Play Store system imageを選択します。既存のSDKが`/Volumes/SSD-4TB/HakoData/sdk`など標準外の場所にある場合も、ランチャーが自動検出します。
 
 ## カスタム実行環境
 
@@ -62,11 +64,11 @@ zsh scripts/provision-custom-runtime.command
 
 ## 起動
 
-1. `dist/Mactician.app`を起動します。
-2. Android SDKのパスを入力します。
-3. 起動するAVD名を入力します。
-4. 必要ならAndroidパッケージ名を入力します。
-5. 「起動」を押します。
+- `dist/Hako.app`を起動します。
+- Android SDKのパスを入力します。
+- 起動するAVD名を入力します。
+- 必要ならAndroidパッケージ名を入力します。
+- `起動`を押します。
 
 パッケージ名を空欄にすると、AVDだけを起動します。Play Storeから導入したゲームは、インストール後にパッケージ名を指定して起動できます。
 
@@ -85,4 +87,4 @@ zsh scripts/provision-custom-runtime.command
 
 ## ライセンス
 
-MIT License。Android、Google Play、ゲーム本体および各ゲームの名称・データは、それぞれの権利者に帰属します。
+MIT License。Android、Google Play、ゲーム本体および各ゲームの名称やデータは、それぞれの権利者に帰属します。
