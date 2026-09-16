@@ -5,12 +5,12 @@ labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Thanks for helping improve Mactician. Remove account names and other personal data from logs before attaching them.
+      value: Thanks for helping improve Hako. Remove account names and other personal data from logs before attaching them.
   - type: input
     id: launcher-version
     attributes:
-      label: Mactician version and build
-      placeholder: 1.0.0 (33)
+      label: Hako version and build
+      placeholder: 1.2.4 (53)
     validations:
       required: true
   - type: input
@@ -79,7 +79,7 @@ body:
     id: logs
     attributes:
       label: Sanitized logs
-      description: Paste relevant log excerpts. Remove Riot account names, filesystem usernames, tokens, and other private data.
+      description: Paste relevant log excerpts. Remove account names, filesystem usernames, tokens, device identifiers, and other private data.
       render: shell
   - type: checkboxes
     id: privacy
