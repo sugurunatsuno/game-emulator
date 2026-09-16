@@ -137,7 +137,7 @@ final class EmulatorModel: ObservableObject {
         }
         let process = Process()
         process.executableURL = emulatorURL
-        process.arguments = ["@\(avdName)", "-gpu", "host", "-no-snapshot", "-no-boot-anim"]
+        process.arguments = ["@\(avdName)", "-gpu", "host", "-no-boot-anim"]
         process.environment = ProcessInfo.processInfo.environment.merging(
             ["ANDROID_AVD_HOME": avdHome]
         ) { _, new in new }
