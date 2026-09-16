@@ -58,9 +58,12 @@ final class EmulatorModel: ObservableObject {
     @Published private(set) var isRunning = false
     private var emulator: Process?
     private var avdHome: String
+    private let serial = "emulator-5554"
 
     init(defaults: UserDefaults = .standard) {
-        let detectedSDK = defaults.string(forKey: "sdkRoot") ?? Self.defaultSDKRoot()
+        let savedSDK = defaults.string(forKey: "sdkRoot")
+        let detectedSDK = savedSDK.flatMap { Self.hasAndroidTools($0) ? $0 : nil }
+            ?? Self.defaultSDKRoot()
         sdkRoot = detectedSDK
         avdHome = Self.defaultAVDHome(sdkRoot: detectedSDK)
         avdName = defaults.string(forKey: "avdName")
@@ -138,6 +141,14 @@ final class EmulatorModel: ObservableObject {
         process.environment = ProcessInfo.processInfo.environment.merging(
             ["ANDROID_AVD_HOME": avdHome]
         ) { _, new in new }
+        process.terminationHandler = { [weak self] process in
+            Task { @MainActor in
+                guard let self, self.isRunning else { return }
+                self.emulator = nil
+                self.isRunning = false
+                self.status = "AVDが終了しました（終了コード: \(process.terminationStatus)）"
+            }
+        }
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError
         do {
@@ -163,10 +174,10 @@ final class EmulatorModel: ObservableObject {
             for _ in 0..<120 {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard isRunning else { return }
-                if run(adbURL, arguments: ["shell", "getprop", "sys.boot_completed"]) == "1" {
+                if run(adbURL, arguments: ["-s", serial, "shell", "getprop", "sys.boot_completed"]) == "1" {
                     if packageName.isEmpty {
                         status = "AVDの起動が完了しました"
-                    } else if run(adbURL, arguments: ["shell", "monkey", "-p", packageName, "1"]) != nil {
+                    } else if run(adbURL, arguments: ["-s", serial, "shell", "monkey", "-p", packageName, "1"]) != nil {
                         status = "ゲームを起動しました: \(packageName)"
                     } else {
                         status = "AVDは起動しましたが、ゲームを起動できませんでした"
