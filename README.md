@@ -11,6 +11,7 @@ Apple Silicon Macから、ローカルのAndroid SDKとAVDを使ってゲーム�
 - Android SDKの場所の指定
 - Androidパッケージ名を指定したゲーム起動
 - 設定のmacOSユーザーデフォルトへの保存
+- 個人利用向けカスタムAndroid実行環境のローカル生成
 
 ## 必要環境
 
@@ -47,6 +48,18 @@ ANDROID_RUNTIME_ROOT="$HOME/Library/Application Support/Mactician/sdk" \
 
 AVDはAndroid Studioで作成してください。Google Playを使うゲームでは、Play Store system imageを選択します。既存のSDKが`/Volumes/SSD-4TB/MacticianData/sdk`など標準外の場所にある場合も、ランチャーが自動検出します。
 
+## カスタム実行環境
+
+個人利用向けに、root可能なGoogle APIs系ARM64イメージから初期設定済みAVDを生成できます。ROMや生成済みuserdataはリポジトリへ含めません。
+
+```zsh
+zsh scripts/provision-custom-runtime.command
+```
+
+既定ではUIアニメーション、画面設定、DPI、logcatサイズなどをゲーム向けに初期化します。任意のGuest Agent APKも初期userdataへ事前導入できます。
+
+詳しくは[カスタムAndroid実行環境](docs/custom-runtime.md)を参照してください。
+
 ## 起動
 
 1. `dist/Mactician.app`を起動します。
@@ -66,6 +79,8 @@ AVDはAndroid Studioで作成してください。Google Playを使うゲーム�
 - ゲーム固有の処理をランチャー本体へ入れない
 - Android SDK、AVD、APK、ゲームデータをリポジトリへ保存しない
 - 起動対象はユーザーが入力したAVDとパッケージに限定する
+- カスタム実行環境の生成物は配布せず、生成手順と設定だけを管理する
+- Play Store用AVDと改変可能な開発用AVDを分離する
 - 追加の高速化は、標準動作を壊さない独立した実験として追加する
 
 ## ライセンス
