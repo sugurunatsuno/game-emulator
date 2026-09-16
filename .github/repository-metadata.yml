@@ -1,7 +1,7 @@
-description: A minimal open-source macOS launcher for Android games on Apple Silicon.
+description: Hako is a minimal open-source macOS launcher for Android games on Apple Silicon.
 homepage: https://github.com/sugurunatsuno/game-emulator
 topics:
-  - mactician
+  - hako
   - macos
   - swift
   - swiftui
