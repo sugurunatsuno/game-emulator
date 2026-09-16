@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Hako app icon</title>
+  <desc id="desc">A dark macOS icon with a cyan open box and a warm white play symbol.</desc>
+  <defs>
+    <linearGradient id="bg" x1="160" y1="120" x2="880" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17242B"/>
+      <stop offset=".52" stop-color="#0B151A"/>
+      <stop offset="1" stop-color="#070C0F"/>
+    </linearGradient>
+    <linearGradient id="top" x1="330" y1="300" x2="690" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#49E6D2"/>
+      <stop offset="1" stop-color="#1AB7AA"/>
+    </linearGradient>
+    <linearGradient id="left" x1="300" y1="420" x2="520" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20C9BB"/>
+      <stop offset="1" stop-color="#0C7772"/>
+    </linearGradient>
+    <linearGradient id="right" x1="520" y1="420" x2="760" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16988F"/>
+      <stop offset="1" stop-color="#07534F"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="48%" r="48%">
+      <stop stop-color="#2FE3D0" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#2FE3D0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="180" y1="130" x2="840" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".18"/>
+      <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".03"/>
+      <stop offset="1" stop-color="#51E8D4" stop-opacity=".18"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+    <clipPath id="squircle">
+      <rect x="64" y="64" width="896" height="896" rx="210"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <rect x="64" y="64" width="896" height="896" rx="210" fill="url(#bg)"/>
+    <circle cx="512" cy="500" r="360" fill="url(#glow)"/>
+    <ellipse cx="512" cy="762" rx="278" ry="72" fill="#000000" opacity=".35" filter="url(#shadow)"/>
+
+    <path d="M512 282 748 410 512 538 276 410Z" fill="url(#top)"/>
+    <path d="M276 410 512 538v248L276 658Z" fill="url(#left)"/>
+    <path d="M748 410 512 538v248l236-128Z" fill="url(#right)"/>
+
+    <path d="M512 282 638 214 820 314 748 410Z" fill="#5EF1DD" opacity=".82"/>
+    <path d="M512 282 386 214 204 314 276 410Z" fill="#249F98" opacity=".88"/>
+
+    <path d="M430 500v248" stroke="#77F2E2" stroke-opacity=".34" stroke-width="8" stroke-linecap="round"/>
+    <path d="M594 500v248" stroke="#001F20" stroke-opacity=".30" stroke-width="8" stroke-linecap="round"/>
+
+    <circle cx="512" cy="618" r="104" fill="#071113" opacity=".74"/>
+    <path d="M486 558c0-13 14-21 25-14l94 59c11 7 11 23 0 30l-94 59c-11 7-25-1-25-14Z" fill="#FFF5DE"/>
+  </g>
+
+  <rect x="64" y="64" width="896" height="896" rx="210" fill="none" stroke="url(#edge)" stroke-width="8"/>
+</svg>
