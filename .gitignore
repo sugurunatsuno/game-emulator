@@ -4,6 +4,7 @@
 /launcher/.build/
 /runtime/
 /.build/
+/branding/generated/
 *.app.zip
 *.dmg
 
