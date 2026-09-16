@@ -1,11 +1,11 @@
 #!/bin/zsh
 set -euo pipefail
 
-# Play Store イメージは root 化せず、TFT と別の AVD として扱う。
+# Play Store イメージは root 化せず、開発用AVDと別に扱う。
 readonly PROJECT_DIR="${0:A:h:h}"
 source "$PROJECT_DIR/scripts/android-environment.sh"
 
-readonly SDK_ROOT="${PLAYSTORE_ANDROID_SDK_ROOT:-${TFT_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-}}}"
+readonly SDK_ROOT="${PLAYSTORE_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-}}"
 readonly AVD_HOME="${PLAYSTORE_AVD_HOME:-${ANDROID_AVD_HOME:-$HOME/.android/avd}}"
 readonly AVD_NAME="${PLAYSTORE_AVD_NAME:-PlayStore}"
 readonly IMAGE_DIR="${PLAYSTORE_SYSTEM_IMAGE_DIR:-$SDK_ROOT/system-images/android-35/google_apis_playstore/arm64-v8a}"

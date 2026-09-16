@@ -7,11 +7,8 @@
 *.app.zip
 *.dmg
 
-# Private game/build inputs and generated experiment binaries
+# Private game/build inputs and generated binaries
 /private/
-/artifacts/tft-pbe-18.1-5212127-original/
-/artifacts/tft-pbe-18.1-5212127-native-gles30/
-/artifacts/tft-pbe-18.1-5212127-native-gles31/
 /launcher.zip
 *.apk
 *.apks
@@ -34,7 +31,6 @@ hardware-qemu.ini.lock
 # Measurements, logs, traces, and crash data
 /measurements/
 *.log
-!/scripts/test-fixtures/unreal-startup/TFT.log
 logcat*.txt
 *.trace
 *.perfetto-trace

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
+    <string>ja</string>
     <key>CFBundleDisplayName</key>
     <string>Mactician</string>
     <key>CFBundleExecutable</key>
@@ -16,8 +16,7 @@
     <string>6.0</string>
     <key>CFBundleLocalizations</key>
     <array>
-        <string>en</string>
-        <string>ru</string>
+        <string>ja</string>
     </array>
     <key>CFBundleName</key>
     <string>Mactician</string>
@@ -39,20 +38,6 @@
         <true/>
     </dict>
     <key>NSHumanReadableCopyright</key>
-    <string>Mactician is free and open source. TFT and Riot Games are property of their respective owners.</string>
-    <key>SUAllowsAutomaticUpdates</key>
-    <true/>
-    <key>SUAutomaticallyUpdate</key>
-    <false/>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUFeedURL</key>
-    <string>https://sergeinaumov.dev/mactician/updates/appcast.xml</string>
-    <key>SUPublicEDKey</key>
-    <string>77t8YuvP4mvvP/3oMpVR/TqGRMCcUlrpWFIZGcWqokY=</string>
-    <key>SUScheduledCheckInterval</key>
-    <integer>86400</integer>
-    <key>SUVerifyUpdateBeforeExtraction</key>
-    <true/>
+    <string>Mactician is free and open source.</string>
 </dict>
 </plist>

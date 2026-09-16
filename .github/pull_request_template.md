@@ -1,27 +1,11 @@
-## Summary
+## 概要
 
-Describe the problem, the change, and its scope.
+<!-- 変更の目的を短く書いてください。 -->
 
-## Motivation
+## 確認項目
 
-Explain why this change is needed and why this scope is appropriate.
-
-## Validation
-
-- [ ] `./scripts/verify-repository.command`
-- [ ] `./scripts/test-mactician.command`
-- [ ] Relevant manual or integration checks are described below, or are not applicable.
-
-## Screenshots
-
-Attach before/after screenshots for UI changes, or write “Not applicable.”
-
-## Contributor checklist
-
-- [ ] I did not add game APKs, Android images, private runtime state, credentials, logs, or generated build products.
-- [ ] Developer-facing output and documentation are in English.
-- [ ] New machine paths are resolved from environment variables, standard locations, or `PATH`.
-- [ ] Behavior changes include tests or a concrete reason why a test is impractical.
-- [ ] Performance claims include reproducible evidence and avoid overstating noisy results.
-- [ ] Documentation, changelog, and release notes are updated when applicable.
-- [ ] Existing rollback, Repair, Reset, and fail-closed behavior is preserved or the deliberate change is explained.
+- [ ] ゲーム固有の処理を追加していない
+- [ ] `zsh -n scripts/build-mactician.command` を実行した
+- [ ] `zsh -n scripts/provision-playstore-avd.command` を実行した
+- [ ] `./scripts/build-mactician.command` を実行した
+- [ ] 認証情報、APK、AVDデータ、ログを含めていない

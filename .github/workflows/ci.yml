@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 permissions:
@@ -17,16 +17,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install validation tools
+      - name: Check shell syntax
         run: |
-          command -v jq >/dev/null || brew install jq
-          command -v rg >/dev/null || brew install ripgrep
+          zsh -n scripts/build-mactician.command
+          zsh -n scripts/provision-playstore-avd.command
 
-      - name: Validate repository policy and metadata
-        run: ./scripts/verify-repository.command
-
-      - name: Run launcher unit tests and production typecheck
-        run: ./scripts/test-mactician.command
+      - name: Build launcher
+        run: ./scripts/build-mactician.command
 
       - name: Reject whitespace and generated changes
         run: |

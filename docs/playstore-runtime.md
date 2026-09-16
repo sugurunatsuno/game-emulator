@@ -1,14 +1,14 @@
 # Google Play Store runtime
 
-MacticianのTFTランタイムとは別に、Google Play Store system image用のAVDを作成する。
+標準の開発用AVDとは別に、Google Play Store system image用のAVDを作成する。
 
 ## 方針
 
-- TFT: `google_apis` + root可能なAVD + ANGLE/OpenGL overlay + ASG/QEMU実験。
-- Play Store系ゲーム: `google_apis_playstore` + 専用AVD。TFT用overlay、branding patch、ASG設定は適用しない。
+- 開発用: `google_apis`など、デバッグと検証に適したイメージ。
+- Play Store系ゲーム: `google_apis_playstore` + 専用AVD。開発用のroot化や実験設定は適用しない。
 - ゲームAPKとGoogleのアプリはリポジトリに同梱しない。Google Play Storeからユーザーが取得する。
 
-Play Store imageはPlay StoreとGoogle Play servicesを含む一方、release-key署名のためroot化できない。したがって、TFTの高速化経路と同じAVDに統合しない。
+Play Store imageはPlay StoreとGoogle Play servicesを含む一方、release-key署名のためroot化できない。したがって、開発用の検証経路と同じAVDに統合しない。
 
 ## 作成
 

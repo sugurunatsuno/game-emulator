@@ -3,110 +3,142 @@ import SwiftUI
 
 @main
 struct MacticianApp: App {
-    @NSApplicationDelegateAdaptor(LauncherAppDelegate.self) private var appDelegate
-    @StateObject private var model: LauncherModel
-    @StateObject private var updateController: LauncherUpdateController
-    @State private var showAbout = false
-
-    init() {
-        let model = LauncherModel()
-        _model = StateObject(wrappedValue: model)
-        _updateController = StateObject(wrappedValue: LauncherUpdateController())
-        LauncherAppDelegate.pendingModel = model
-    }
+    @StateObject private var model = EmulatorModel()
 
     var body: some Scene {
-        WindowGroup("Mactician") {
-            LauncherView(model: model, updateController: updateController)
-                .frame(minWidth: 1080, minHeight: 660)
-                .sheet(isPresented: $showAbout) {
-                    MacticianAboutView()
-                }
+        WindowGroup("Android ゲームエミュレータ") {
+            EmulatorView(model: model)
+                .frame(minWidth: 620, minHeight: 430)
         }
-        .windowStyle(.hiddenTitleBar)
-        .commands {
-            CommandGroup(replacing: .newItem) { }
-            CommandGroup(replacing: .appInfo) {
-                Button("About Mactician") {
-                    showAbout = true
-                }
-            }
-            CommandGroup(after: .appInfo) {
-                Button(LauncherL10n.text("updates.check")) {
-                    updateController.checkForUpdates()
-                }
-                .disabled(!updateController.canCheckForUpdates)
-            }
-        }
+        .commands { CommandGroup(replacing: .newItem) { } }
     }
 }
 
-struct MacticianAboutView: View {
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
-    private var build: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "local"
-    }
+struct EmulatorView: View {
+    @ObservedObject var model: EmulatorModel
 
     var body: some View {
-        VStack(spacing: LauncherTheme.Spacing.regular) {
-            MacticianMark()
-                .frame(width: 88, height: 88)
-                .accessibilityLabel("Mactician")
-            VStack(spacing: LauncherTheme.Spacing.xSmall) {
-                Text("Mactician")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                Text(LauncherL10n.text("about.descriptor"))
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(LauncherTheme.ColorToken.textSecondary)
-                Text("Version \(version) (\(build))")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(LauncherTheme.ColorToken.textTertiary)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Android ゲームエミュレータ")
+                .font(.system(size: 28, weight: .bold))
+            Text("既存のAndroid SDKとAVDを使ってゲームを起動します。")
+                .foregroundStyle(.secondary)
+            GroupBox("実行環境") {
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Android SDKのパス", text: $model.sdkRoot)
+                    TextField("AVD名", text: $model.avdName)
+                    TextField("起動するパッケージ（任意）", text: $model.packageName)
+                }
+                .textFieldStyle(.roundedBorder)
             }
-            VStack(spacing: LauncherTheme.Spacing.xSmall) {
-                Text("Free and open source.")
-                Text("Built for two tacticians. Shared with everyone.")
+            HStack {
+                Button(model.isRunning ? "停止" : "起動") {
+                    model.isRunning ? model.stop() : model.start()
+                }
+                .keyboardShortcut(.defaultAction)
+                Button("設定を保存") { model.saveSettings() }
+                    .disabled(model.isRunning)
             }
-            .font(.system(size: 13))
-            .multilineTextAlignment(.center)
-            HStack(spacing: LauncherTheme.Spacing.regular) {
-                aboutLink("Website", destination: MacticianIdentity.websiteURL)
-                aboutLink("GitHub", destination: MacticianIdentity.sourceURL)
-                aboutLink("Technical story", destination: MacticianIdentity.technicalStoryURL)
-                aboutLink("Report an issue", destination: MacticianIdentity.issueURL)
-            }
+            Text(model.status)
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            Spacer()
         }
-        .foregroundColor(LauncherTheme.ColorToken.textPrimary)
-        .padding(LauncherTheme.Spacing.xLarge)
-        .frame(width: 560, height: 360)
-        .background(LauncherTheme.ColorToken.surface)
-        .preferredColorScheme(.dark)
-    }
-
-    private func aboutLink(_ title: String, destination: URL) -> some View {
-        Link(title, destination: destination)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(LauncherTheme.ColorToken.interactive)
+        .padding(28)
     }
 }
 
 @MainActor
-final class LauncherAppDelegate: NSObject, NSApplicationDelegate {
-    static weak var pendingModel: LauncherModel?
+final class EmulatorModel: ObservableObject {
+    @Published var sdkRoot: String
+    @Published var avdName: String
+    @Published var packageName: String
+    @Published private(set) var status = "起動待機中"
+    @Published private(set) var isRunning = false
+    private var emulator: Process?
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+    init(defaults: UserDefaults = .standard) {
+        sdkRoot = defaults.string(forKey: "sdkRoot")
+            ?? ProcessInfo.processInfo.environment["ANDROID_SDK_ROOT"]
+            ?? "\(NSHomeDirectory())/Library/Android/sdk"
+        avdName = defaults.string(forKey: "avdName") ?? "PlayStore"
+        packageName = defaults.string(forKey: "packageName") ?? ""
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+    func saveSettings() {
+        UserDefaults.standard.set(sdkRoot, forKey: "sdkRoot")
+        UserDefaults.standard.set(avdName, forKey: "avdName")
+        UserDefaults.standard.set(packageName, forKey: "packageName")
+        status = "設定を保存しました"
     }
 
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        Self.pendingModel?.shutdown()
-        return .terminateNow
+    func start() {
+        guard !avdName.isEmpty else { status = "AVD名を入力してください"; return }
+        let emulatorURL = URL(fileURLWithPath: sdkRoot).appendingPathComponent("emulator/emulator")
+        let adbURL = URL(fileURLWithPath: sdkRoot).appendingPathComponent("platform-tools/adb")
+        guard FileManager.default.isExecutableFile(atPath: emulatorURL.path),
+              FileManager.default.isExecutableFile(atPath: adbURL.path) else {
+            status = "Android SDKのemulatorまたはadbが見つかりません"
+            return
+        }
+        let process = Process()
+        process.executableURL = emulatorURL
+        process.arguments = ["@\(avdName)", "-gpu", "host", "-no-snapshot", "-no-boot-anim"]
+        process.standardOutput = FileHandle.standardOutput
+        process.standardError = FileHandle.standardError
+        do {
+            try process.run()
+            emulator = process
+            isRunning = true
+            status = "AVDを起動しています…"
+            waitForBoot(adbURL: adbURL)
+        } catch {
+            status = "起動に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    func stop() {
+        emulator?.terminate()
+        emulator = nil
+        isRunning = false
+        status = "停止しました"
+    }
+
+    private func waitForBoot(adbURL: URL) {
+        Task { @MainActor in
+            for _ in 0..<120 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard isRunning else { return }
+                if run(adbURL, arguments: ["shell", "getprop", "sys.boot_completed"]) == "1" {
+                    if packageName.isEmpty {
+                        status = "AVDの起動が完了しました"
+                    } else if run(adbURL, arguments: ["shell", "monkey", "-p", packageName, "1"]) != nil {
+                        status = "ゲームを起動しました: \(packageName)"
+                    } else {
+                        status = "AVDは起動しましたが、ゲームを起動できませんでした"
+                    }
+                    return
+                }
+            }
+            status = "AVDの起動がタイムアウトしました"
+        }
+    }
+
+    private func run(_ executable: URL, arguments: [String]) -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
     }
 }
