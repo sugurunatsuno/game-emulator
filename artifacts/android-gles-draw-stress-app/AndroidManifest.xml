@@ -7,7 +7,7 @@
         android:allowBackup="false"
         android:debuggable="true"
         android:hasCode="true"
-        android:label="Mactician GLES Draw Probe"
+        android:label="Hako GLES Draw Probe"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
         <activity
             android:name=".DrawStressActivity"
