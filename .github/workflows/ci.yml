@@ -19,11 +19,12 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          zsh -n scripts/build-mactician.command
+          zsh -n scripts/build-hako.command
+          zsh -n scripts/provision-custom-runtime.command
           zsh -n scripts/provision-playstore-avd.command
 
       - name: Build launcher
-        run: ./scripts/build-mactician.command
+        run: ./scripts/build-hako.command
 
       - name: Reject whitespace and generated changes
         run: |
