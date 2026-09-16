@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-readonly ROOT="${ANDROID_RUNTIME_ROOT:-${HOME}/Library/Application Support/Mactician/sdk}"
+readonly ROOT="${ANDROID_RUNTIME_ROOT:-${HOME}/Library/Application Support/Hako/sdk}"
 readonly DOWNLOADS="$ROOT/.downloads"
 readonly PLATFORM_URL="https://dl.google.com/android/repository/platform-tools_r36.0.2-darwin.zip"
 readonly PLATFORM_SHA256="106a5d31fad8c1c0c5a180d06f5779767d129d7d5edbe629005c11a85eec5b4b"
