@@ -7,7 +7,7 @@
         android:allowBackup="false"
         android:debuggable="true"
         android:hasCode="true"
-        android:label="Mactician GLES UBO Probe"
+        android:label="Hako GLES UBO Probe"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
         <activity
             android:name=".UboStressActivity"
